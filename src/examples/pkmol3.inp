@@ -1,0 +1,7 @@
+tolerance 2.0
+filetype xyz
+output thio_60_90_120b.xyz
+structure 4_Thiouracil-Water_1.xyz
+number 1
+fixed 1.0 2.0 0.0 -1.57 -4.188 -1.047
+end structure

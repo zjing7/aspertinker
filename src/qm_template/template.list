@@ -1,0 +1,4 @@
+#
+sapt2/atz psi4 psi4.sapt2p.augccpvtz memory geometry
+sapt2/adz psi4 psi4.sapt2p.augccpvdz memory geometry
+opt/b3lyp g16 g16.opt.b3lyp.631gd    memory geometry numproc chkfile 
