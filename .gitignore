@@ -1,4 +1,7 @@
 # QM test files
+src/*.com
+src/*.gjf
+src/*.psi4
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
