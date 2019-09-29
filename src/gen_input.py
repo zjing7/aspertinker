@@ -105,10 +105,11 @@ class QMInput(GeomConvert):
         if not isinstance(method, QMMethod): 
             raise TypeError
         self.fill_missing()
-        frags = []
         molecule = ''
         ngrps = len(self.group_idx)
-        frags = ['%d %d '%tuple(self.multiplicity[-1])]
+        frags = []
+        if ngrps > 1:
+            frags = ['%d %d '%tuple(self.multiplicity[-1])]
 
         for igrp, grp in enumerate(self.group_idx):
             nmulti = self.multiplicity[igrp]
