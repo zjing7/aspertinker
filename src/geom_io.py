@@ -225,7 +225,6 @@ class GeomConvert(GeomFile):
         for i in range(n2):
             if len(geo.multiplicity) <= i:
                 geo.multiplicity.append((0, 1))
-        self.multiplicity = self.multiplicity[:n1] + geo.multiplicity[:n2]
         n1grps = len(self.group_idx)
         n2grps = len(geo.group_idx)
         if n1grps == 0:
@@ -236,6 +235,7 @@ class GeomConvert(GeomFile):
             #geo.group_idx = [list(geo.top_name)]
         n1grps = len(self.group_idx)
         n2grps = len(geo.group_idx)
+        self.multiplicity = self.multiplicity[:n1grps] + geo.multiplicity[:n2grps]
         for i in range(n2grps):
             if new_frag:
                 new_idx = [K+n1 for K in geo.group_idx[i]]
