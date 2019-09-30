@@ -187,9 +187,9 @@ class QMResult(GeomConvert):
 
 if __name__ == '__main__':
     q0 = QMResult()
-    q0.read_input('examples/Acetonitrile-Water_2.xyz', ftype='xyz')
-    q0.read_qm('examples/Acetonitrile-Water_2.out', ftype='g16')
-    q0.read_qm('examples/Acetonitrile-Water_1.out', ftype='g16')
+    q0.read_input('scratch/Acetonitrile-Water_2.xyz', ftype='xyz')
+    q0.read_qm('scratch/Acetonitrile-Water_2.out', ftype='g16')
+    q0.read_qm('scratch/Acetonitrile-Water_1.out', ftype='g16')
 
     q0.qm_data.to_csv('7.csv')
     q0.find_best_frame()
@@ -201,7 +201,7 @@ if __name__ == '__main__':
     q1.write_qm('7.gjf', theory='opt/b3lyp')
 
 
-    #q0.read_input('examples/Trimethylammonium-Acetate_1.xyz', ftype='xyz')
-    #q0.read_qm('examples/Trimethylammonium-Acetate_1.out', ftype='g16')
-    #q0.read_qm('examples/Trimethylammonium-Acetate_1.out', ftype='xyz')
+    #q0.read_input('scratch/Trimethylammonium-Acetate_1.xyz', ftype='xyz')
+    #q0.read_qm('scratch/Trimethylammonium-Acetate_1.out', ftype='g16')
+    #q0.read_qm('scratch/Trimethylammonium-Acetate_1.out', ftype='xyz')
     #print(q0.nframes)

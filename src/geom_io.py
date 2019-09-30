@@ -17,6 +17,12 @@ class GeomFile:
         self.iframe = None
         self.group_idx = []
         self.multiplicity = []
+        # atom index does not have to be consecutive. By default it starts from 1
+        # rank starts from 0. Used to index frame, which is np.ndarray
+        # group_idx uses iatom = rank+1
+        # Sorry, I know this is confusing. A better way is to create a class to convert between these numbers
+
+        # the dicts map atom index to other info
         self.top_natoms = 0
         self.top_name = {}
         self.top_conn = {}
