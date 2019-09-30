@@ -122,10 +122,12 @@ class QMInput(GeomConvert):
             else:
                 grp_s = ''
             for iatom in grp:
-                i = iatom-1
-                frags[-1] += '%s%s %12.4f %12.4f %12.4f\n'%(self.top_name[iatom], grp_s, self.coord[i][0], self.coord[i][1], self.coord[i][2])
+                i = iatom - 1
+                idx = self.idx_list[i]
+                frags[-1] += '%s%s %12.4f %12.4f %12.4f\n'%(self.top_name[idx], grp_s, self.coord[i][0], self.coord[i][1], self.coord[i][2])
         molecule = ''.join(frags)
-        outf2 = '.'.join(outf.split('.')[:-1]) + '.chk'
+        #outf2 = '.'.join(outf.split('.')[:-1]) + '.chk'
+        outf2 = '.'.join(os.path.split(outf)[-1].split('.')[:-1]) + '.chk'
         fmts = self.get_default()
         fmts['geometry'] = molecule
         fmts['chkfile'] = outf2
@@ -146,7 +148,9 @@ class QMInput(GeomConvert):
             frags.append('%d %d\n'%tuple(nmulti))
             for iatom in grp:
                 i = iatom - 1
-                frags[-1] += '%s %12.4f %12.4f %12.4f\n'%(self.top_name[iatom], self.coord[i][0], self.coord[i][1], self.coord[i][2])
+                idx = self.idx_list[i]
+                #i = self.idx_to_rank[iatom]
+                frags[-1] += '%s %12.4f %12.4f %12.4f\n'%(self.top_name[idx], self.coord[i][0], self.coord[i][1], self.coord[i][2])
         molecule = '--\n'.join(frags)
         fmts = self.get_default()
         fmts['geometry'] = molecule
@@ -201,19 +205,27 @@ class Assemble(QMInput):
         a1 = self.measure([idx1[1], idx1[0], idx1[2]])
         a2 =  geo.measure([idx2[1], idx2[0], idx2[2]])
 
+        b11 = self.measure([idx1[1], idx1[0]])
+        b12 = self.measure([idx1[0], idx1[2]])
+        b21 =  geo.measure([idx2[1], idx2[0]])
+        b22 =  geo.measure([idx2[0], idx2[2]])
+
         d0 = 179.0
         b0 = 1.5
         if mode == 'face':
-            r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1, idx1[2], d0], [-1, b0, idx1[0], 180-0.5*a2, idx1[1], 1.0], [-1, b0, idx1[0], 180-0.5*a2, -2, 179.0]]
+            r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1, idx1[2], d0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 1.0], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
             self.add_mol_int(geo, r_int, idx2[:3])
+
         elif mode == 'vertical':
-            r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1, idx1[2], d0], [-1, b0, idx1[0], 180-0.5*a2, idx1[1], 90.0], [-1, b0, idx1[0], 180-0.5*a2, -2, 179.0]]
+            r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1, idx1[2], d0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 90.0], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
             self.add_mol_int(geo, r_int, idx2[:3])
+
         elif mode == 'T-shape':
-            r_int = [[idx1[0], r0, idx1[1], 90.0, idx1[2], 90.0], [-1, b0, idx1[0], 180-0.5*a2, idx1[1], 90.0-0.5*a1], [-1, b0, idx1[0], 180-0.5*a2, -2, 179.0]]
+            r_int = [[idx1[0], r0, idx1[1], 90.0, idx1[2], 90.0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 90.0-0.5*a1], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
             self.add_mol_int(geo, r_int, idx2[:3])
+
         elif mode == 'parallel':
-            r_int = [[idx1[0], r0, idx1[1], 90.0, idx1[2], 90.0], [-1, b0, idx1[0], 90.0, idx1[1], 0], [-1, b0, idx1[0], 90.0, idx1[2], 0.0]]
+            r_int = [[idx1[0], r0, idx1[1], 90.0, idx1[2], 90.0], [-1, b21, idx1[0], 90.0, idx1[1], 0], [-1, b22, idx1[0], 90.0, idx1[2], 0.0]]
             self.add_mol_int(geo, r_int, idx2[:3])
         else:
             print(self.add_mol.__doc__)
@@ -290,7 +302,6 @@ if __name__ == '__main__':
     q1.add_mol(q2, [1, 3, 7], [1, 3, 7], mode='parallel', r0=4.0)
     q1.add_mol(q2, [1, 3, 7], [1, 3, 7], mode='T-shape',  r0=4.0)
     q1.add_mol(q2, [1, 3, 7], [1, 3, 7], mode='vertical', r0=4.0)
-    q1.add_mol(q2, [1, 3, 7], [1, 3, 7], mode='?', r0=4.0)
     q1.get_template()
     #q1.write_qm('5.psi4', 'sapt2/adz')
     q1.write_qm('6.gjf', 'opt/b3lyp')

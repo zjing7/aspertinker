@@ -22,6 +22,8 @@ class GeomFile:
         self.top_conn = {}
         self.top_type = {}
         self.comments = []
+        self.idx_list = []
+        self.idx_to_rank = {}
 
     def measure(self, ids, iframe=0):
         if len(self.frames) <= iframe:
@@ -174,12 +176,20 @@ class GeomConvert(GeomFile):
         self.cells = geo.cells
         self.nframes = len(self.frames)
         self.iframe = geo.iframe
-        if self.iframe is not None and self.iframe < self.nframes:
+        if self.iframe is None:
+            self.iframe = 0
+        if self.iframe < self.nframes:
             self.coord = self.frames[self.iframe]
         self.top_name = geo.top_name
         self.top_type = geo.top_type
         self.top_conn = geo.top_conn
         self.top_natoms = len(self.coord)
+        self.idx_list = sorted(list(self.top_name))
+        self.idx_to_rank.clear()
+        for rank in range(len(self.idx_list)):
+            idx = self.idx_list[rank]
+            self.idx_to_rank[idx] = rank
+
 
     def shift_idx(self, n0, geo: GeomFile):
         '''
@@ -220,8 +230,10 @@ class GeomConvert(GeomFile):
         n2grps = len(geo.group_idx)
         if n1grps == 0:
             self.group_idx = [list(range(1, n1+1))]
+            #self.group_idx = [list(self.top_name)]
         if n2grps == 0:
             geo.group_idx = [list(range(1, n2+1))]
+            #geo.group_idx = [list(geo.top_name)]
         n1grps = len(self.group_idx)
         n2grps = len(geo.group_idx)
         for i in range(n2grps):
@@ -232,16 +244,17 @@ class GeomConvert(GeomFile):
             self.group_idx.append(new_idx)
         
 
-        geo2 = self.shift_idx(n1, geo)
+        geo2 = self.shift_idx(self.idx_list[-1], geo)
 
         self.top_name.update(geo2.top_name)
         self.top_type.update(geo2.top_type)
         self.top_conn.update(geo2.top_conn)
 
-
         for iframe in range(self.nframes):
             self.frames[iframe] = np.append(self.frames[iframe], geo.frames[iframe], axis=0)
         self.coord = self.frames[self.iframe]
+
+        self.assign_geo(self)
 
     def read_input(self, inpf, ftype=None):
         supported_ftypes = {'xyz':self.read_xyz, 'tinker':self.read_tinker, 'arc':self.read_tinker}
