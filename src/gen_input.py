@@ -25,6 +25,7 @@ class QMInput(GeomConvert):
         self.memory = 20
         self.numproc = 8
         self.disk = 100
+        self.methods = {}
 
     def get_template(self, flist = None):
         if flist == None:

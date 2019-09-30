@@ -1,0 +1,32 @@
+%chk=Trimethylammonium-Acetate_1.chk
+%nproc=8
+%mem=20GB
+# opt(ModRedundant) freq b3lyp/6-31g(d) nosymm
+
+Optimization
+
+0 1 1 1 -1 1 
+N(Fragment=1)       0.0000       0.0001      -0.3263
+C(Fragment=1)       1.0818       0.9470       0.1088
+C(Fragment=1)       0.2793      -1.4103       0.1087
+C(Fragment=1)      -1.3611       0.4632       0.1088
+H(Fragment=1)       0.0001       0.0001      -1.3553
+H(Fragment=1)       1.1080       0.9697       1.2015
+H(Fragment=1)       2.0305       0.5882      -0.2988
+H(Fragment=1)       0.8516       1.9350      -0.2985
+H(Fragment=1)       0.2859      -1.4443       1.2015
+H(Fragment=1)      -0.5057      -2.0525      -0.2989
+H(Fragment=1)       1.2501      -1.7048      -0.2986
+H(Fragment=1)      -1.5248       1.4643      -0.2985
+H(Fragment=1)      -2.1014      -0.2302      -0.2988
+H(Fragment=1)      -1.3939       0.4742       1.2016
+C(Fragment=2)      -0.2988      -1.6632      -6.9258
+C(Fragment=2)      -0.7350      -1.3464      -5.4784
+O(Fragment=2)      -1.9472      -1.5393      -5.2017
+O(Fragment=2)       0.1831      -0.9246      -4.7260
+H(Fragment=2)       0.4920      -2.4136      -6.9085
+H(Fragment=2)      -1.1333      -2.0222      -7.5246
+H(Fragment=2)       0.1219      -0.7660      -7.3806
+
+
+
