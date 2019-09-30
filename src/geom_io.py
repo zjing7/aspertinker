@@ -58,7 +58,8 @@ class GeomFile:
             v = self.calc_angnorm(*xyzs)
         return v
 
-    def calc_dtoline(self, ra, rb, rc):
+    @staticmethod
+    def calc_dtoline(ra, rb, rc):
         "Distance of A to BC"
         ra = np.asarray(ra) # vector a
         rb = np.asarray(rb)
@@ -73,7 +74,8 @@ class GeomFile:
         d = np.linalg.norm(r)
         return d
 
-    def calc_angnorm(self, ra, rb, rc, rd, re, rf):
+    @staticmethod
+    def calc_angnorm(ra, rb, rc, rd, re, rf):
         '''
         Angle between norms of two planes
         '''
@@ -99,7 +101,8 @@ class GeomFile:
             pass
         return angle
 
-    def calc_dtoplane(self, ra, rb, rc, rd):
+    @staticmethod
+    def calc_dtoplane(ra, rb, rc, rd):
         ra = np.asarray(ra) # vector a
         rb = np.asarray(rb)
         rc = np.asarray(rc)
@@ -113,7 +116,8 @@ class GeomFile:
         d = np.dot(rba, nbcd)/np.linalg.norm(nbcd)
         return d
 
-    def calc_pseudo(self, r1, r2, r3, r4, r5):
+    @staticmethod
+    def calc_pseudo(r1, r2, r3, r4, r5):
         '''
         doi.org/10.1093/nar/gkp608
         Conformational analysis of nucleic acids
@@ -143,7 +147,8 @@ class GeomFile:
             angle = -angle
         angle = (angle + 90)%360 - 90.0
         return angle
-    def calc_tors(self, ra, rb, rc, rd):
+    @staticmethod
+    def calc_tors(ra, rb, rc, rd):
         ra = np.asarray(ra) # vector a
         rb = np.asarray(rb)
         rc = np.asarray(rc)
@@ -392,7 +397,7 @@ class GeomConvert(GeomFile):
         return geo
 
 if __name__ == '__main__':
-    geo = QMInput()
+    geo = GeomConvert()
     #geo.read_input('4_Thiouracil-Water_1.xyz')
     geo.read_input('mol.arc')
     print(geo.coord)
