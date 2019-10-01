@@ -4,7 +4,7 @@ import os,sys
 sys.path.append('/home/zj2244/Projects/zjing7/aspertinker/src')
 import numpy as np
 import copy
-from gen_input import Assemble
+from qm_input import Assemble
 from quantum_io import QMResult
 import pandas as pd
 

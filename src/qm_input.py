@@ -85,23 +85,6 @@ class QMInput(GeomConvert):
         else:
             self.print_all_methods()
 
-
-    def fill_missing(self):
-        if len(self.group_idx) == 0:
-            self.group_idx = [list(range(1, self.top_natoms+1))]
-
-        nmulti_t = [0, 0]
-        for igrp, grp in enumerate(self.group_idx):
-            if len(self.multiplicity) > igrp:
-                nmulti = self.multiplicity[igrp]
-            else:
-                nmulti = (0, 1)
-                self.multiplicity.append(nmulti)
-            nmulti_t[0] += nmulti[0]
-            nmulti_t[1] += nmulti[1] - 1
-        nmulti_t[1] += 1
-        self.multiplicity.append(nmulti_t)
-
     def write_g16(self, outf, method: QMMethod):
         if not isinstance(method, QMMethod): 
             raise TypeError
@@ -166,108 +149,6 @@ class Assemble(QMInput):
     def __init__(self):
         super(Assemble, self).__init__()
 
-    def add_mol(self, geo, idx1, idx2, r0=3.0, mode='face'):
-        r'''
-        mode: 'face' | 'vertical' | 'T-shape' | 'parallel'
-
-              'face': 
-              i3            j3
-                \          /
-                 i1  ...  j1
-                /          \
-              i2            j2
-
-
-              'vertical': 
-              i3              
-                \           .j3
-                 i1  ...  j1   
-                /           `j2
-              i2              
-
-
-              'T-shape': 
-                   i3              
-                  /     
-                 i1    .j3
-                  \ ` j1    
-                   i2  `j2         
-
-
-              'parallel': 
-                   i3         
-                  /     j3
-                 i1    / 
-                  \ ` j1
-                   i2  \     
-                        j2
-                               
-        '''
-        a1 = self.measure([idx1[1], idx1[0], idx1[2]])
-        a2 =  geo.measure([idx2[1], idx2[0], idx2[2]])
-
-        b11 = self.measure([idx1[1], idx1[0]])
-        b12 = self.measure([idx1[0], idx1[2]])
-        b21 =  geo.measure([idx2[1], idx2[0]])
-        b22 =  geo.measure([idx2[0], idx2[2]])
-
-        d0 = 179.0
-        b0 = 1.5
-        if mode == 'face':
-            r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1, idx1[2], d0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 1.0], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
-            self.add_mol_int(geo, r_int, idx2[:3])
-
-        elif mode == 'vertical':
-            r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1, idx1[2], d0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 90.0], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
-            self.add_mol_int(geo, r_int, idx2[:3])
-
-        elif mode == 'T-shape':
-            r_int = [[idx1[0], r0, idx1[1], 90.0, idx1[2], 90.0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 90.0-0.5*a1], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
-            self.add_mol_int(geo, r_int, idx2[:3])
-
-        elif mode == 'parallel':
-            r_int = [[idx1[0], r0, idx1[1], 90.0, idx1[2], 90.0], [-1, b21, idx1[0], 90.0, idx1[1], 0], [-1, b22, idx1[0], 90.0, idx1[2], 0.0]]
-            self.add_mol_int(geo, r_int, idx2[:3])
-        else:
-            print(self.add_mol.__doc__)
-
-    def add_mol_int(self, geo: GeomFile, r_int, anchor_idx):
-        '''
-        Call GeomConvert.append_frag to append a fragment
-        Then apply geometry operations
-        
-        r_int: [i1, B1, i2, A1, i3, D1], ...
-               i < 0 indicates the index |i| in the new internel coord
-
-        anchor_idx: the indices of atoms in the new mol to be aligned to the internel coord
-        '''
-        if not isinstance(geo, GeomFile): 
-            raise TypeError
-        n1 = self.top_natoms
-        n2 = geo.top_natoms
-        n2a = len(r_int)
-        if n2a != len(anchor_idx):
-            return
-        for i2 in anchor_idx:
-            if i2 > n2:
-                return
-        anchor_i = [K-1 for K in anchor_idx]
-        for i2 in range(n2a):
-            for ii in range(0, len(r_int[i2]), 2):
-                if r_int[i2][ii] < 0:
-                    # convert monomer atom index to dimer atom index
-                    i_new = (-r_int[i2][ii]) + n1
-                    if i_new >= n1+n2a:
-                        return
-                    r_int[i2][ii] = i_new
-
-        self.append_frag(geo)
-        for iframe in range(self.nframes):
-            coord = self.frames[iframe]
-            rdimer_int = list(coord[:n1]) + r_int
-            rdimer_car = int_to_xyz(rdimer_int)
-            xyz2 = align_slow(coord[n1:], rdimer_car[n1:],anchor_i,  list(range(n2a)))
-            coord[n1:] = xyz2
 
 if __name__ == '__main__':
     #qmfile = QMInput()

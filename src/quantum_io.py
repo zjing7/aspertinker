@@ -2,7 +2,7 @@
 import numpy as np
 import copy
 from geom_io import GeomFile, GeomConvert
-from gen_input import QMInput
+from qm_input import QMInput
 import pandas as pd
 import re
 class QMEntry:
