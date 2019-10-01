@@ -20,5 +20,9 @@ ELEMENT_NUMBER = \
                    49,  50,  51,  52,  53,  54,
          55,  56,                                     78,  79,  80,
          )
+ELEMENT_MASS_APPROX = [K*2.0 for K in ELEMENT_NUMBER]
+ELEMENT_MASS_APPROX[0] = 1.0
+
 NR_2_ELE = dict(zip(ELEMENT_NUMBER, ELEMENT_NAME))
 ELE_2_NR = dict(zip(ELEMENT_NAME, ELEMENT_NUMBER))
+ELE_2_MASS = dict(zip(ELEMENT_NAME, ELEMENT_MASS_APPROX))

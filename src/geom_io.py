@@ -1,7 +1,9 @@
 #
+import pandas as pd
 import numpy as np
 import copy
 from utils import align_slow, int_to_xyz
+from chem_constants import *
 
 DEBUG_FLAG = True
 
@@ -30,7 +32,38 @@ class GeomFile:
         self.top_type = {}
         self.comments = []
         self.idx_list = []
+        self.mass_list = []
         self.idx_to_rank = {}
+
+    def traj_rmsd(self, sels=None, outf=None, weight=None):
+        if sels is None:
+            sels = [list(range(1, self.top_natoms+1))]
+        elif sels == 'group':
+            sels = self.group_idx
+
+        seli = []
+        for sel in sels:
+            seli.append([K-1 for K in sel])
+
+        ngrp = len(sels)
+
+        if weight is 'mass' and len(self.mass_list) == self.top_natoms:
+            weight = self.mass_list
+        elif weight is None or len(weight) != self.top_natoms:
+            weight = np.ones(self.top_natoms)
+        weight = np.asarray(weight)
+
+        df_rmsd = pd.DataFrame(columns = ['G%d'%K for K in range(1, ngrp+1)])
+        i0 = 0
+        for i1 in range(0, self.nframes):
+            for isel, sel in enumerate(seli):
+                col = 'G%d'%(isel+1)
+                rms = align_slow(self.frames[i1][sel], self.frames[i0][sel], wt1=weight[sel], rmsd=True)
+                df_rmsd.loc[i1, col] = rms
+        if outf is not None:
+            df_rmsd.to_csv(outf, float_format='%.4f')
+        return df_rmsd
+        
 
     def measure(self, ids, iframe=0):
         if len(self.frames) <= iframe:
@@ -192,16 +225,29 @@ class GeomConvert(GeomFile):
             self.iframe = 0
         if self.iframe < self.nframes:
             self.coord = self.frames[self.iframe]
+        self.group_idx = geo.group_idx
+        self.multiplicity = geo.multiplicity
         self.top_name = geo.top_name
         self.top_type = geo.top_type
         self.top_conn = geo.top_conn
         self.top_natoms = len(self.coord)
+        self.mass_list = geo.mass_list
         self.idx_list = sorted(list(self.top_name))
         self.idx_to_rank.clear()
         for rank in range(len(self.idx_list)):
             idx = self.idx_list[rank]
             self.idx_to_rank[idx] = rank
 
+    def guess_mass(self):
+        self.mass_list = []
+        for idx in self.idx_list:
+            name = self.top_name[idx]
+            mass = 1.008
+            for ele in (name[0:2].capitalize(), name[0].upper(), 'H'):
+                if ele in ELE_2_MASS:
+                    mass = ELE_2_MASS[ele]
+                    break
+            self.mass_list.append(mass)
 
     def shift_idx(self, n0, geo: GeomFile):
         '''

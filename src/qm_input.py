@@ -1,11 +1,9 @@
 
 from geom_io import GeomFile, GeomConvert, debug_w
-import geom_io
 from utils import align_slow, int_to_xyz
 import os
 from string import Template
 import numpy as np
-import scipy.optimize
 
 class QMMethod():
     def __init__(self, program='', tplt_file='', keywords=[]):

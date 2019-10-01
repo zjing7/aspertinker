@@ -22,19 +22,6 @@ def calc_tors(ra, rb, rc, rd):
         pass
     return angle
 
-def int_residual(x, rbc, nabc, cosD):
-    '''
-    solve x = nbcd using least squares
-
-    # nbcd . rbc == 0
-    # nabc . nbcd == cos(D)
-    # nbcd . nbcd == 1
-    '''
-    X = np.asarray(x)
-    eq1 = np.dot(X, rbc)
-    eq2 = np.dot(nabc, X) - (cosD)
-    eq3 = np.dot(X, X) - 1
-    return eq1, eq2, eq3
 
 def coord_trans(xyz3, int3):
     '''
@@ -54,6 +41,20 @@ def coord_trans(xyz3, int3):
 
     nabc = np.cross(rab, rbc)
     nabc /= np.linalg.norm(nabc)
+
+    def int_residual(x, rbc, nabc, cosD):
+        '''
+        solve x = nbcd using least squares
+
+        # nbcd . rbc == 0
+        # nabc . nbcd == cos(D)
+        # nbcd . nbcd == 1
+        '''
+        X = np.asarray(x)
+        eq1 = np.dot(X, rbc)
+        eq2 = np.dot(nabc, X) - (cosD)
+        eq3 = np.dot(X, X) - 1
+        return eq1, eq2, eq3
 
     sols = []
     for x0 in [[1.0, 1.0, 1.1], [-1.0, -1.0, -1.1]]:
@@ -142,7 +143,7 @@ def ang_to_mat(ang):
 
     return np.dot(np.dot(Rz, Ry), Rx)
 
-def align_slow(R1, R2, sel1=None, sel2=None):
+def align_slow(R1, R2, sel1=None, sel2=None, wt1=None, wt2=None, rmsd=False):
     '''
     RMSD align using least square
     return aligned coordiates of R1
@@ -153,13 +154,18 @@ def align_slow(R1, R2, sel1=None, sel2=None):
         sel1 = list(range(len(R1)))
     if sel2 is None:
         sel2 = list(range(len(R2)))
+    if wt1 is None or len(wt1) != len(R1):
+        wt1 = np.ones(len(R1))
+    wt1 = np.asarray(wt1)
+    wt1 = wt1/np.sum(wt1)
+
     if len(sel1) != len(sel2):
         print(sel1, sel2)
         print("ERROR: Numbers of atoms (%d, %d) in selection do not match"%(len(sel1), len(sel2)))
         raise ValueError
         return R1
 
-    def residual(ang, r1, r2):
+    def residual(ang, r1, r2, wt):
         mat = ang_to_mat(ang)
         com1 = np.mean(r1, axis=0).reshape(1,3)
         com2 = np.mean(r2, axis=0).reshape(1,3)
@@ -167,11 +173,11 @@ def align_slow(R1, R2, sel1=None, sel2=None):
         #r1p = np.dot(mat, (r1-com1).T).T + com1
         r1p = np.dot((r1-com1), mat) + com2
 
-        resi = (r1p - r2).ravel()
+        resi = ((r1p - r2)*np.sqrt(wt.reshape(-1,1))).ravel()
         return resi
 
     sols = []
-    sols.append( scipy.optimize.least_squares(residual, rot_ang0, verbose=0, kwargs={'r1':R1[sel1,:], 'r2':R2[sel2,:]}))
+    sols.append( scipy.optimize.least_squares(residual, rot_ang0, verbose=0, kwargs={'r1':R1[sel1,:], 'r2':R2[sel2,:], 'wt':wt1[sel1]}))
     rot_ang = sols[0].x
     rot_mat = ang_to_mat(rot_ang)
 
@@ -179,7 +185,11 @@ def align_slow(R1, R2, sel1=None, sel2=None):
     com2 = np.mean(R2[sel2,:], axis=0)
     #R1p = np.dot(rot_mat, (R1-com1).T).T + com2
     R1p = np.dot((R1-com1), rot_mat) + com2
-    return R1p
+    if rmsd:
+        natom = len(R1p)
+        return np.linalg.norm((R1p-R2)*np.sqrt(wt1.reshape(-1,1)))
+    else:
+        return R1p
 
 if __name__ == '__main__':
     #xyz0 = np.array([[1.0, -1, 0], [1.0, 0, 0], [0.0, 0.0, 0]])
