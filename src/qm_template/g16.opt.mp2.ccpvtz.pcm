@@ -1,0 +1,10 @@
+%chk=${chkfile}
+%nproc=${numproc}
+%mem=${memory}GB
+# opt(ModRedundant) freq mp2/cc-pVTZ nosymm scrf(pcm)
+
+Optimization
+
+${geometry}
+
+

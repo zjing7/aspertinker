@@ -162,25 +162,32 @@ class QMResult(GeomConvert):
 
     def find_best_frame(self):
         '''
-        Current find the frame with lowest energy
+        Currently find the frame with lowest energy
         Can be adapted for other purpose
         '''
         ndata = len(self.qm_data)
-        if ndata > 0 and 'Energy' in self.qm_data:
+        if ndata == 0:
+            return
+        sub_idx = self.qm_data.index
+
+        if 'Success' in self.qm_data and sum(self.qm_data['Success'] == True) > 0:
+            sub_idx = self.qm_data.index[self.qm_data['Success'] == True]
+
+        if 'Energy' in self.qm_data:
             try:
-                iframe = self.qm_data['Energy'].idxmin()
+                iframe = self.qm_data.loc[sub_idx, 'Energy'].idxmin()
             except:
                 # the idxmin() method may have a bug when there are multiple NaN
                 e_min = self.MAX_VALUE
-                i_min = self.qm_data.index[0]
-                for iframe in self.qm_data.index:
+                i_min = sub_idx[0]
+                for iframe in sub_idx:
                     value = self.qm_data.loc[iframe, 'Energy']
                     if np.isreal(value) and np.isfinite(value) and value < e_min:
                         e_min = value
                         i_min = iframe
                 iframe = i_min
         else:
-            iframe = self.qm_data.index[-1]
+            iframe = sub_idx[-1]
         self.iframe = iframe
         self.coord = self.frames[iframe]
 

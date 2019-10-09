@@ -1,6 +1,7 @@
 #
 import pandas as pd
 import numpy as np
+import os
 import copy
 from utils import align_slow, int_to_xyz
 from chem_constants import *
@@ -213,9 +214,16 @@ class GeomConvert(GeomFile):
         super(GeomConvert, self).__init__()
         pass
 
-    def assign_geo(self, geo: GeomFile):
+    def assign_geo(self, geo: GeomFile, update_top=True):
+        '''
+        Copy coordinates from a GeomFile object
+        Optionally keep original topology information, if natoms are the same
+        '''
         if not isinstance(geo, GeomFile): 
             raise TypeError
+
+        if self.top_natoms != geo.top_natoms:
+            update_top = True
 
         self.frames = geo.frames
         self.cells = geo.cells
@@ -225,18 +233,20 @@ class GeomConvert(GeomFile):
             self.iframe = 0
         if self.iframe < self.nframes:
             self.coord = self.frames[self.iframe]
-        self.group_idx = geo.group_idx
-        self.multiplicity = geo.multiplicity
-        self.top_name = geo.top_name
-        self.top_type = geo.top_type
-        self.top_conn = geo.top_conn
-        self.top_natoms = len(self.coord)
-        self.mass_list = geo.mass_list
-        self.idx_list = sorted(list(self.top_name))
-        self.idx_to_rank.clear()
-        for rank in range(len(self.idx_list)):
-            idx = self.idx_list[rank]
-            self.idx_to_rank[idx] = rank
+
+        if update_top:
+            self.group_idx = geo.group_idx
+            self.multiplicity = geo.multiplicity
+            self.top_name = geo.top_name
+            self.top_type = geo.top_type
+            self.top_conn = geo.top_conn
+            self.top_natoms = len(self.coord)
+            self.mass_list = geo.mass_list
+            self.idx_list = sorted(list(self.top_name))
+            self.idx_to_rank.clear()
+            for rank in range(len(self.idx_list)):
+                idx = self.idx_list[rank]
+                self.idx_to_rank[idx] = rank
 
     def guess_mass(self):
         self.mass_list = []
@@ -330,9 +340,51 @@ class GeomConvert(GeomFile):
         nmulti_t[1] += 1
         self.multiplicity.append(nmulti_t)
 
+    def write_struct(self, outf, ftype=None):
+        supported_ftypes = {'xyz':self.write_xyz, 'tinker':self.write_tinker, 'arc':self.write_tinker}
+        if ftype is None or ftype not in supported_ftypes:
+            suffix = outf.split('.')[-1]
+            ftype = suffix
+        if ftype in supported_ftypes:
+            outdir = os.path.dirname(outf)
+            if not os.path.isdir(outdir):
+                os.mkdir(outdir)
+            supported_ftypes[ftype](outf)
+        else:
+            print("WARNING: filetype of %s is not recognized"%(outf))
+
+    def write_xyz(self, outf):
+        outp = '%d\n'%(self.top_natoms)
+        outp += '\n'
+        for i in range(self.top_natoms):
+            idx = self.idx_list[i]
+            name = self.top_name[idx]
+            outp += '%4s %12.5f %12.5f %12.5f\n'%(name, self.coord[i,0], self.coord[i,1], self.coord[i,2])
+        with open(outf, 'w') as fout:
+            fout.write(outp)
+
+    def write_tinker(self, outf):
+        outp = '%d\n'%(self.top_natoms)
+        outp += '\n'
+        for i in range(self.top_natoms):
+            idx = self.idx_list[i]
+            name = self.top_name[idx]
+            if idx in self.top_type:
+                atype = self.top_type[idx]
+            else:
+                atype = 0
+            if idx in self.top_conn:
+                conns = ''.join([' %4d'%K for K in self.top_conn[idx]])
+            else:
+                conns = ''
+            outp += ' %4d %4s %12.5f %12.5f %12.5f %5d%s\n'%(idx, name, self.coord[i,0], self.coord[i,1], self.coord[i,2], atype, conns)
+        with open(outf, 'w') as fout:
+            fout.write(outp)
+        pass
+
     def read_input(self, inpf, ftype=None):
         supported_ftypes = {'xyz':self.read_xyz, 'tinker':self.read_tinker, 'arc':self.read_tinker}
-        if ftype == None or ftype not in supported_ftypes:
+        if ftype is None or ftype not in supported_ftypes:
             suffix = inpf.split('.')[-1]
             ftype = suffix
         if ftype in supported_ftypes:
@@ -518,6 +570,10 @@ class GeomConvert(GeomFile):
 
         elif mode == 'vertical':
             r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1, idx1[2], d0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 90.0], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
+            self.add_mol_int(geo, r_int, idx2[:3])
+
+        elif mode == 'vertical-side':
+            r_int = [[idx1[0], r0, idx1[1], 180-0.5*a1-30, idx1[2], d0], [-1, b21, idx1[0], 180-0.5*a2, idx1[1], 90.0], [-1, b22, idx1[0], 180-0.5*a2, -2, 179.0]]
             self.add_mol_int(geo, r_int, idx2[:3])
 
         elif mode == 'T-shape':

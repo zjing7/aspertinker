@@ -53,6 +53,7 @@ class QMInput(GeomConvert):
         kws['memory'] = '%d'%self.memory
         kws['numproc'] = '%d'%self.numproc
         kws['disk'] = '%d'%self.disk
+        kws['nfrag'] = '%d'%(len(self.group_idx))
         return kws
 
     def convert_fmt_string(self, fmt, reverse=False):
@@ -79,6 +80,9 @@ class QMInput(GeomConvert):
         if theory in self.methods:
             method = self.methods[theory]
             if method.program in self.QM_WRITE:
+                outdir = os.path.dirname(outf)
+                if not os.path.isdir(outdir):
+                    os.mkdir(outdir)
                 self.QM_WRITE[method.program](outf, method)
         else:
             self.print_all_methods()
