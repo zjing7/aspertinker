@@ -3,6 +3,15 @@
 sapt2/atz psi4 psi4.sapt2p.augccpvtz       memory geometry
 sapt2/adz psi4 psi4.sapt2p.augccpvdz       memory geometry
 dfmp2/adtz psi4 psi4.mp2.cbs.augccpvdtz    memory geometry
+dfmp2/int/atz psi4 psi4.mp2.int.augccpvtz  memory geometry
+dfmp2/int/def2tzvpd psi4 psi4.mp2.int.def2tzvpd    memory geometry
+dfmp2/int/def2qzvp psi4 psi4.mp2.int.def2qzvp      memory geometry
+dfmp2/int/def2qzvppd psi4 psi4.mp2.int.def2qzvppd  memory geometry
+b3lyp/int/dzvp psi4 psi4.b3lyp.int.dzvp    memory geometry
+blyp/int/dzvp psi4 psi4.blyp.int.dzvp      memory geometry
+pbe/int/dzvp psi4 psi4.pbe.int.dzvp        memory geometry
+pbe0/int/dzvp psi4 psi4.pbe0.int.dzvp      memory geometry
+tpss/int/dzvp psi4 psi4.tpss.int.dzvp      memory geometry
 opt/b3lyp g16 g16.opt.b3lyp.631gd          memory geometry numproc chkfile 
 opt/b3lyp/pcm g16 g16.opt.b3lyp.631gd.pcm  memory geometry numproc chkfile 
 opt/mp2 g16 g16.opt.mp2.631gd              memory geometry numproc chkfile 
@@ -10,3 +19,11 @@ opt/mp2/pcm g16 g16.opt.mp2.631gd.pcm      memory geometry numproc chkfile
 opt/mp2/tz/cp g16 g16.opt.cp.mp2.ccpvtz    memory geometry numproc chkfile nfrag 
 opt/mp2/tz     g16 g16.opt.mp2.ccpvtz      memory geometry numproc chkfile
 opt/mp2/tz/pcm g16 g16.opt.mp2.ccpvtz.pcm  memory geometry numproc chkfile
+x3lyp/int/def2tzvpd  psi4 psi4.x3lyp.int.def2tzvpd memory geometry
+wb97mv/int/def2tzvpd psi4 psi4.wb97mv.int.def2tzvpd memory geometry
+wb97xv/int/def2tzvpd psi4 psi4.wb97xv.int.def2tzvpd memory geometry
+mp2d/int/def2tzvpd   psi4 psi4.mp2d.int.def2tzvpd   memory geometry
+mp2d/int/def2qzvppd  psi4 psi4.mp2d.int.def2qzvppd  memory geometry
+dsdpbep86nl/int/def2tzvpd psi4 psi4.dsdpbep86nl.int.def2tzvpd memory geometry
+dsdpbep86nl/int/def2qzvp  psi4 psi4.dsdpbep86nl.int.def2qzvp memory geometry
+snsmp2/aqz psi4 psi4.snsmp2.int.augccpvqz memory geometry

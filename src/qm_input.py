@@ -85,6 +85,7 @@ class QMInput(GeomConvert):
                     os.mkdir(outdir)
                 self.QM_WRITE[method.program](outf, method)
         else:
+            print(theory, 'not supported')
             self.print_all_methods()
 
     def write_g16(self, outf, method: QMMethod):
@@ -110,7 +111,7 @@ class QMInput(GeomConvert):
             for iatom in grp:
                 i = iatom - 1
                 idx = self.idx_list[i]
-                frags[-1] += '%s%s %12.4f %12.4f %12.4f\n'%(self.top_name[idx], grp_s, self.coord[i][0], self.coord[i][1], self.coord[i][2])
+                frags[-1] += '%s%s %12.5f %12.5f %12.5f\n'%(self.top_name[idx], grp_s, self.coord[i][0], self.coord[i][1], self.coord[i][2])
         molecule = ''.join(frags)
         #outf2 = '.'.join(outf.split('.')[:-1]) + '.chk'
         outf2 = '.'.join(os.path.split(outf)[-1].split('.')[:-1]) + '.chk'
@@ -136,7 +137,7 @@ class QMInput(GeomConvert):
                 i = iatom - 1
                 idx = self.idx_list[i]
                 #i = self.idx_to_rank[iatom]
-                frags[-1] += '%s %12.4f %12.4f %12.4f\n'%(self.top_name[idx], self.coord[i][0], self.coord[i][1], self.coord[i][2])
+                frags[-1] += '%s %12.5f %12.5f %12.5f\n'%(self.top_name[idx], self.coord[i][0], self.coord[i][1], self.coord[i][2])
         molecule = '--\n'.join(frags)
         fmts = self.get_default()
         fmts['geometry'] = molecule

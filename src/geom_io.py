@@ -586,6 +586,7 @@ class GeomConvert(GeomFile):
         else:
             print(self.add_mol.__doc__)
 
+
     def add_mol_int(self, geo: GeomFile, r_int, anchor_idx):
         '''
         Call GeomConvert.append_frag to append a fragment
@@ -623,6 +624,37 @@ class GeomConvert(GeomFile):
             rdimer_car = int_to_xyz(rdimer_int)
             xyz2 = align_slow(coord[n1:], rdimer_car[n1:],anchor_i,  list(range(n2a)))
             coord[n1:] = xyz2
+
+    def var_dist(self, geo, idx1, idx2, r0=None, r_rel=None):
+
+        if not isinstance(geo, GeomFile): 
+            raise TypeError
+        if r0 is None and r_rel is None:
+            print("No distance specified")
+            return
+
+        n1 = self.top_natoms
+        n2 = geo.top_natoms
+
+        self.append_frag(geo)
+
+        for iframe in range(self.nframes):
+            coord = self.frames[iframe]
+            Rg1 = np.mean(coord[[K-1 for K in idx1],:], axis=0)
+            Rg2 = np.mean(coord[[K+n1-1 for K in idx2],:], axis=0)
+
+            _R = Rg2 - Rg1 
+            _r = np.linalg.norm(_R)
+            _R0 = _R/_r
+
+            if r0 is None:
+                dr = _r*(r_rel-1)
+            else:
+                dr = r0 - _r
+
+            coord[n1:] += (_R0*dr).reshape(1,3)
+
+
 
 if __name__ == '__main__':
     geo = GeomConvert()
