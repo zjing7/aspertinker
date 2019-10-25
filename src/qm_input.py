@@ -24,6 +24,14 @@ class QMInput(GeomConvert):
         self.numproc = 8
         self.disk = 100
         self.methods = {}
+        self.psi4_energy = 'scf'
+        self.psi4_basis =  'def2-TZVP'
+        self.keywords = {}
+        self.keywords['memory'] = 20
+        self.keywords['disk'] = 100
+        self.keywords['numproc'] = 8
+        self.keywords['psi4_energy'] = 'scf'
+        self.keywords['psi4_basis'] = 'def2-TZVP'
 
     def get_template(self, flist = None):
         if flist == None:
@@ -48,11 +56,12 @@ class QMInput(GeomConvert):
 
         self.methods = methods
 
+    def set_keywords(self, kwarg):
+        self.keywords.update(kwarg)
+
     def get_default(self):
         kws = {}
-        kws['memory'] = '%d'%self.memory
-        kws['numproc'] = '%d'%self.numproc
-        kws['disk'] = '%d'%self.disk
+        kws.update(self.keywords)
         kws['nfrag'] = '%d'%(len(self.group_idx))
         return kws
 
@@ -76,7 +85,8 @@ class QMInput(GeomConvert):
         outp += '-'*8 + '\n'
         print(outp)
 
-    def write_qm(self, outf, theory):
+    def write_qm(self, outf, theory, kws={}):
+        self.set_keywords(kws)
         if theory in self.methods:
             method = self.methods[theory]
             if method.program in self.QM_WRITE:

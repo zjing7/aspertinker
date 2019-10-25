@@ -231,7 +231,7 @@ class GeomConvert(GeomFile):
         self.iframe = geo.iframe
         if self.iframe is None:
             self.iframe = 0
-        if self.iframe < self.nframes:
+        if self.iframe < self.nframes and self.nframes > 0:
             self.coord = self.frames[self.iframe]
 
         if update_top:

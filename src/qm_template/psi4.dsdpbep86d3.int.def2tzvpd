@@ -9,8 +9,9 @@ symmetry c1  #important for SAPT in psi4, default
 }
 
 set {
-basis aug-cc-pVQZ
+basis def2-TZVPD
 scf_type DF
 freeze_core True
 }
-energy('sns-mp2')
+energy('scf', dft_functional = 'DSD-PBEP86-D3BJ', bsse_type='cp')
+

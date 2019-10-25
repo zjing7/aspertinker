@@ -1,5 +1,7 @@
 # index of qm template files
 # index, program, filename, keywords to be replaced
+psi4 psi4 psi4.gen.nocp                    memory geometry psi4_energy psi4_basis
+psi4/cp psi4 psi4.gen.cp                   memory geometry psi4_energy psi4_basis
 sapt2/atz psi4 psi4.sapt2p.augccpvtz       memory geometry
 sapt2/adz psi4 psi4.sapt2p.augccpvdz       memory geometry
 dfmp2/adtz psi4 psi4.mp2.cbs.augccpvdtz    memory geometry
@@ -12,6 +14,20 @@ blyp/int/dzvp psi4 psi4.blyp.int.dzvp      memory geometry
 pbe/int/dzvp psi4 psi4.pbe.int.dzvp        memory geometry
 pbe0/int/dzvp psi4 psi4.pbe0.int.dzvp      memory geometry
 tpss/int/dzvp psi4 psi4.tpss.int.dzvp      memory geometry
+b3lyp-d3bj/int/dzvp psi4 psi4.b3lyp.int.dzvp    memory geometry
+blyp-d3bj/int/dzvp psi4 psi4.blyp.int.dzvp      memory geometry
+pbe-d3bj/int/dzvp psi4 psi4.pbe.int.dzvp        memory geometry
+pbe0-d3bj/int/dzvp psi4 psi4.pbe0.int.dzvp      memory geometry
+tpss-d3bj/int/dzvp psi4 psi4.tpss.int.dzvp      memory geometry
+
+b3lyp/dzvp/nocp psi4 psi4.b3lyp.dzvp.nocp    memory geometry
+blyp/dzvp/nocp  psi4 psi4.blyp.dzvp.nocp     memory geometry
+pbe/dzvp/nocp   psi4 psi4.pbe.dzvp.nocp      memory geometry
+pbe0/dzvp/nocp  psi4 psi4.pbe0.dzvp.nocp     memory geometry
+tpss/dzvp/nocp  psi4 psi4.tpss.dzvp.nocp     memory geometry
+
+x3lyp/int/def2tzvpd  psi4 psi4.x3lyp.int.def2tzvpd      memory geometry
+x3lyp-d3bj/int/def2tzvpd  psi4 psi4.x3lyp.int.def2tzvpd memory geometry
 opt/b3lyp g16 g16.opt.b3lyp.631gd          memory geometry numproc chkfile 
 opt/b3lyp/pcm g16 g16.opt.b3lyp.631gd.pcm  memory geometry numproc chkfile 
 opt/mp2 g16 g16.opt.mp2.631gd              memory geometry numproc chkfile 
@@ -19,11 +35,28 @@ opt/mp2/pcm g16 g16.opt.mp2.631gd.pcm      memory geometry numproc chkfile
 opt/mp2/tz/cp g16 g16.opt.cp.mp2.ccpvtz    memory geometry numproc chkfile nfrag 
 opt/mp2/tz     g16 g16.opt.mp2.ccpvtz      memory geometry numproc chkfile
 opt/mp2/tz/pcm g16 g16.opt.mp2.ccpvtz.pcm  memory geometry numproc chkfile
-x3lyp/int/def2tzvpd  psi4 psi4.x3lyp.int.def2tzvpd memory geometry
-wb97mv/int/def2tzvpd psi4 psi4.wb97mv.int.def2tzvpd memory geometry
-wb97xv/int/def2tzvpd psi4 psi4.wb97xv.int.def2tzvpd memory geometry
-mp2d/int/def2tzvpd   psi4 psi4.mp2d.int.def2tzvpd   memory geometry
-mp2d/int/def2qzvppd  psi4 psi4.mp2d.int.def2qzvppd  memory geometry
+wb97mv/int/def2tzvpd  psi4 psi4.wb97mv.int.def2tzvpd memory geometry
+wb97mv/int/def2qzvppd psi4 psi4.wb97mv.int.def2qzvppd memory geometry
+wb97md3/int/def2tzvpd psi4 psi4.wb97md3.int.def2tzvpd memory geometry
+wb97md3/int/def2qzvppd psi4 psi4.wb97md3.int.def2qzvppd memory geometry
+wb97xv/int/def2tzvpd  psi4 psi4.wb97xv.int.def2tzvpd memory geometry
+wb97xd/int/def2tzvpd  psi4 psi4.wb97xd.int.def2tzvpd memory geometry
+wb97xd/int/def2qzvppd psi4 psi4.wb97xd.int.def2qzvppd memory geometry
+mp2d/int/def2tzvpd    psi4 psi4.mp2d.int.def2tzvpd   memory geometry
+mp2d/int/def2qzvppd   psi4 psi4.mp2d.int.def2qzvppd  memory geometry
+mp2d/int/cbs/augccpvdtz    psi4 psi4.mp2d.int.cbs.augccpvdtz   memory geometry
+mp2d/int/cbs/augccpvtqz    psi4 psi4.mp2d.int.cbs.augccpvtqz   memory geometry
 dsdpbep86nl/int/def2tzvpd psi4 psi4.dsdpbep86nl.int.def2tzvpd memory geometry
 dsdpbep86nl/int/def2qzvp  psi4 psi4.dsdpbep86nl.int.def2qzvp memory geometry
+dsdpbep86d3/int/def2tzvpd psi4 psi4.dsdpbep86d3.int.def2tzvpd memory geometry
+dsdpbep86d3/int/def2qzvp  psi4 psi4.dsdpbep86d3.int.def2qzvp memory geometry
 snsmp2/aqz psi4 psi4.snsmp2.int.augccpvqz memory geometry
+
+dsdblyp/int/def2qzvp    psi4 psi4.dsdblypd3.int.def2qzvp   memory geometry
+b2gpplyp/int/def2qzvp   psi4 psi4.b2gpplypd3.int.def2qzvp   memory geometry
+wb97xd3/int/def2qzvppd  psi4 psi4.wb97xd3.int.def2qzvppd   memory geometry
+scan/int/def2qzvp       psi4 psi4.scand3.int.def2qzvp   memory geometry
+dsdblyp/int/def2tzvpd   psi4 psi4.dsdblypd3.int.def2tzvpd   memory geometry
+b2gpplyp/int/def2tzvpd  psi4 psi4.b2gpplypd3.int.def2tzvpd   memory geometry
+wb97xd3/int/def2tzvpd   psi4 psi4.wb97xd3.int.def2tzvpd   memory geometry
+scan/int/def2tzvpd      psi4 psi4.scand3.int.def2tzvpd   memory geometry
