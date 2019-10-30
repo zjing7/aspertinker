@@ -17,7 +17,8 @@ class QMInput(GeomConvert):
         super(QMInput, self).__init__()
         #pkgpath = os.path.dirname(os.path.abspath(__file__))
         self.pkgpath = os.path.dirname((__file__))
-        self.template_path = os.path.join(self.pkgpath, 'qm_template', 'template.list')
+        #self.template_path = os.path.join(self.pkgpath, 'qm_template', 'template.list')
+        self.template_path = os.path.join(self.pkgpath, '..', 'dat', 'qm', 'template.list')
         self.QM_WRITE = {'psi4':self.write_psi4, 'g16':self.write_g16}
         self.QM_PROGRAMS = set(self.QM_WRITE)
         self.memory = 20

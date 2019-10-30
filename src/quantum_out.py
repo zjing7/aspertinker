@@ -2,7 +2,7 @@
 import numpy as np
 import copy
 from geom_io import GeomFile, GeomConvert
-from qm_input import QMInput
+from quantum_inp import QMInput
 import pandas as pd
 import re
 class QMEntry:
@@ -98,6 +98,13 @@ class QMResult(GeomConvert):
             en = QMEntry('Error', '')
             #en.set_pattern('^ Error termination request processed by (.*).', convert_func = lambda t: t)
             en.set_pattern('^ Error termination via Lnk1e in (\S+)', convert_func = lambda t: t)
+            all_en.append(en)
+
+        elif ftype == 'tinker':
+            all_en = []
+
+            en = QMEntry('Energy', None)
+            en.set_pattern('^ Total Potential Energy :\s+(%s)\s+\S+'%(self.REGEX_FLOAT))
             all_en.append(en)
 
         elif ftype == 'psi4':

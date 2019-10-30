@@ -2,11 +2,13 @@
 # index, program, filename, keywords to be replaced
 psi4 psi4 psi4.gen.nocp                    memory geometry psi4_energy psi4_basis
 psi4/cp psi4 psi4.gen.cp                   memory geometry psi4_energy psi4_basis
+psi4/opt psi4 psi4.opt.nocp                memory geometry psi4_energy psi4_basis
 sapt2/atz psi4 psi4.sapt2p.augccpvtz       memory geometry
 sapt2/adz psi4 psi4.sapt2p.augccpvdz       memory geometry
 dfmp2/adtz psi4 psi4.mp2.cbs.augccpvdtz    memory geometry
 dfmp2/int/atz psi4 psi4.mp2.int.augccpvtz  memory geometry
 dfmp2/int/def2tzvpd psi4 psi4.mp2.int.def2tzvpd    memory geometry
+dfmp2.5/int/def2tzvpd psi4 psi4.mp25.int.def2tzvpd    memory geometry
 dfmp2/int/def2qzvp psi4 psi4.mp2.int.def2qzvp      memory geometry
 dfmp2/int/def2qzvppd psi4 psi4.mp2.int.def2qzvppd  memory geometry
 b3lyp/int/dzvp psi4 psi4.b3lyp.int.dzvp    memory geometry
@@ -35,6 +37,10 @@ opt/mp2/pcm g16 g16.opt.mp2.631gd.pcm      memory geometry numproc chkfile
 opt/mp2/tz/cp g16 g16.opt.cp.mp2.ccpvtz    memory geometry numproc chkfile nfrag 
 opt/mp2/tz     g16 g16.opt.mp2.ccpvtz      memory geometry numproc chkfile
 opt/mp2/tz/pcm g16 g16.opt.mp2.ccpvtz.pcm  memory geometry numproc chkfile
+opt/dsdpbep86/qz g16 g16.opt.dsdpbep86.qz  memory geometry numproc chkfile
+opt/tpss g16 g16.opt.tpss                  memory geometry numproc chkfile
+g16/dsdpbep86/qz g16 g16.dsdpbep86.qz      memory geometry numproc chkfile
+g16/dsdpbep86/tz g16 g16.dsdpbep86.tz      memory geometry numproc chkfile
 wb97mv/int/def2tzvpd  psi4 psi4.wb97mv.int.def2tzvpd memory geometry
 wb97mv/int/def2qzvppd psi4 psi4.wb97mv.int.def2qzvppd memory geometry
 wb97md3/int/def2tzvpd psi4 psi4.wb97md3.int.def2tzvpd memory geometry

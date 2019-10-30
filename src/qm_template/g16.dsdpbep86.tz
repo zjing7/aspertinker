@@ -1,0 +1,10 @@
+%chk=${chkfile}
+%nproc=${numproc}
+%mem=${memory}GB
+# DSDPBEP86/def2TZVP nosymm
+
+Single Point
+
+${geometry}
+
+

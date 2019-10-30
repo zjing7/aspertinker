@@ -60,7 +60,7 @@ class QMResult(GeomConvert):
         self.regex_coord_start = "No man's land"
         self.regex_coord_line  = "No man's land"
 
-        self.REGEX_FLOAT = '-?\d+(\.\d+)?'
+        self.REGEX_FLOAT = '-?\d+\.\d+'
         self.entry_format = {}
         self.MAX_VALUE = 1e5
         self.MIN_VALUE = -1e5
@@ -76,7 +76,12 @@ class QMResult(GeomConvert):
 
             en = QMEntry('Energy', None)
             #en.set_pattern('^ SCF Done: ', '^ SCF Done:\s+\S+\s+=\s+(%s)\s+A\.U\.'%(self.REGEX_FLOAT), [0])
-            en.set_pattern('^ SCF Done:\s+\S+\s+=\s+(%s)\s+A\.U\.'%(self.REGEX_FLOAT))
+            en.set_pattern('^\s+Total Energy =\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('E2B', None)
+            #en.set_pattern('^ SCF Done: ', '^ SCF Done:\s+\S+\s+=\s+(%s)\s+A\.U\.'%(self.REGEX_FLOAT), [0])
+            en.set_pattern('^\s+2\s\+(%s)\s\+\S+\s+\S+'%(self.REGEX_FLOAT), '^\s+n-Body\s+Total Energy'%(self.REGEX_FLOAT), [2])
             all_en.append(en)
 
             en = QMEntry('MaxForce', None)
@@ -92,7 +97,7 @@ class QMResult(GeomConvert):
             all_en.append(en)
 
             en = QMEntry('Success', False)
-            en.set_pattern('^ Normal termination of Gaussian.*at (.*)\.', convert_func = lambda t: True)
+            en.set_pattern('^\*\*\* Psi4 exiting successfully', convert_func = lambda t: True)
             all_en.append(en)
 
             en = QMEntry('Error', '')
@@ -101,69 +106,6 @@ class QMResult(GeomConvert):
             all_en.append(en)
 
         elif ftype == 'psi4':
-            all_en = []
-
-            en = QMEntry('Energy', None)
-            en.set_pattern('^\s+Total Energy =\s+(%s)'%(self.REGEX_FLOAT))
-            all_en.append(en)
-
-            en = QMEntry('SCS-MP2', None)
-            en.set_pattern('^\s+SCS Total Energy\s+=\s+(%s)'%(self.REGEX_FLOAT))
-            all_en.append(en)
-
-            en = QMEntry('MP2_Ref', None)
-            en.set_pattern('^\s+Reference Energy  \s+=\s+(%s)'%(self.REGEX_FLOAT))
-            all_en.append(en)
-
-            en = QMEntry('MP2_SS', None)
-            en.set_pattern('^\s+Same-Spin Energy  \s+=\s+(%s)'%(self.REGEX_FLOAT))
-            all_en.append(en)
-
-            en = QMEntry('MP2_OS', None)
-            en.set_pattern('^\s+Opposite-Spin Energy  \s+=\s+(%s)'%(self.REGEX_FLOAT))
-            all_en.append(en)
-
-            en = QMEntry('DF-MP2', None)
-            en.set_pattern('^\s+Total Energy \s+= \s+(%s)'%(self.REGEX_FLOAT), '\s+\S+ DF-MP2 Energies \S+', [5, 6, 7, 8, 9, 10])
-            #en.set_pattern('^\s+Total Energy   \s+=  \s+(%s)'%(self.REGEX_FLOAT))
-            all_en.append(en)
-
-            en = QMEntry('E2B', None)
-            en.set_pattern('^\s+2\s+\S+\s+(%s)\s+\S+'%(self.REGEX_FLOAT), '^\s+n-Body\s+Total Energy', [2])
-            all_en.append(en)
-
-            en = QMEntry('EDH', None)
-            en.set_pattern('^\s+@Final double-hybrid DFT total energy\s+=\s+(%s)'%(self.REGEX_FLOAT))
-            all_en.append(en)
-
-            en = QMEntry('SNS-MP2', None)
-            en.set_pattern('^\s+(%s)\s+\S+'%(self.REGEX_FLOAT), '^\s+ SNS-MP2 Interaction Energy ', [1])
-            all_en.append(en)
-
-            en = QMEntry('MaxForce', None)
-            en.set_pattern('^ Maximum\s+Force\s+(%s)\s+%s'%(self.REGEX_FLOAT, self.REGEX_FLOAT))
-            #all_en.append(en)
-
-            en = QMEntry('RMSForce', None)
-            en.set_pattern('^ RMS\s+Force\s+(%s)\s+%s'%(self.REGEX_FLOAT, self.REGEX_FLOAT))
-            #all_en.append(en)
-
-            en = QMEntry('Freq1', None)
-            en.set_pattern('^ Low frequencies ---\s+(%s)\s+'%(self.REGEX_FLOAT), '^ Full mass-weighted force constant matrix', [1])
-            #all_en.append(en)
-
-            en = QMEntry('Time', None)
-            en.set_pattern('^\s+total time\s+=\s+(%s)\s+seconds'%(self.REGEX_FLOAT), '^Total time', [3])
-            all_en.append(en)
-
-            en = QMEntry('Success', False)
-            en.set_pattern('^\*\*\* Psi4 exiting successfully(.*)', convert_func = lambda t: True)
-            all_en.append(en)
-
-            en = QMEntry('Error', '')
-            #en.set_pattern('^ Error termination request processed by (.*).', convert_func = lambda t: t)
-            en.set_pattern('^ Error termination via Lnk1e in (\S+)', convert_func = lambda t: t)
-            #all_en.append(en)
             pass
         self.entry_format.clear()
         self.qm_columns = []
@@ -184,7 +126,6 @@ class QMResult(GeomConvert):
             self.regex_coord_line  = '^\s+\d{1,3}\s+\d{1,3}\s+\d{1,3}\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'
             self.is_coord_line = lambda t: 5 <= (t[0] - t[1]) and (t[0] - t[1]) < t[2]+5
         elif ftype == 'psi4':
-            pass
             self.regex_frame_start = '^\*\*\* tstart\(\) called'
             self.regex_coord_start = '^\s+Center\s+X\s+Y\s+Z\s+'
             self.regex_coord_line  = '^\s+\S{1,7}\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'

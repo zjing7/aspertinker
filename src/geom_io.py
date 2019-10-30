@@ -340,18 +340,39 @@ class GeomConvert(GeomFile):
         nmulti_t[1] += 1
         self.multiplicity.append(nmulti_t)
 
-    def write_struct(self, outf, ftype=None):
+    def write_traj(self, outf, ftype=None):
+        if self.nframes == 0:
+            return
+        self.write_struct(outf, ftype=ftype, frameids=list(range(self.nframes)))
+
+    def write_struct(self, outf, ftype=None, frameids=[]):
         supported_ftypes = {'xyz':self.write_xyz, 'tinker':self.write_tinker, 'arc':self.write_tinker}
+        if len(frameids) == 0:
+            frameids = [self.iframe]
+        outp = ''
         if ftype is None or ftype not in supported_ftypes:
             suffix = outf.split('.')[-1]
             ftype = suffix
         if ftype in supported_ftypes:
             outdir = os.path.dirname(outf)
-            if not os.path.isdir(outdir):
+            if (not os.path.isdir(outdir)) and (outdir != ''):
                 os.mkdir(outdir)
-            supported_ftypes[ftype](outf)
+            with open(outf, 'w') as fout:
+
+                for _i in frameids:
+                    if _i < 0 or _i >= self.nframes:
+                        continue
+                    self.coord = self.frames[_i]
+                    outp = supported_ftypes[ftype](outf)
+                    fout.write(outp)
+
+            # reset coord 
+            self.coord = self.frames[self.iframe]
         else:
             print("WARNING: filetype of %s is not recognized"%(outf))
+            return
+
+
 
     def write_xyz(self, outf):
         outp = '%d\n'%(self.top_natoms)
@@ -360,12 +381,14 @@ class GeomConvert(GeomFile):
             idx = self.idx_list[i]
             name = self.top_name[idx]
             outp += '%4s %12.5f %12.5f %12.5f\n'%(name, self.coord[i,0], self.coord[i,1], self.coord[i,2])
+        return outp
+
         with open(outf, 'w') as fout:
             fout.write(outp)
 
     def write_tinker(self, outf):
         outp = '%d\n'%(self.top_natoms)
-        outp += '\n'
+        #outp += '\n'
         for i in range(self.top_natoms):
             idx = self.idx_list[i]
             name = self.top_name[idx]
@@ -378,6 +401,8 @@ class GeomConvert(GeomFile):
             else:
                 conns = ''
             outp += ' %4d %4s %12.5f %12.5f %12.5f %5d%s\n'%(idx, name, self.coord[i,0], self.coord[i,1], self.coord[i,2], atype, conns)
+        return outp
+
         with open(outf, 'w') as fout:
             fout.write(outp)
         pass
@@ -624,6 +649,35 @@ class GeomConvert(GeomFile):
             rdimer_car = int_to_xyz(rdimer_int)
             xyz2 = align_slow(coord[n1:], rdimer_car[n1:],anchor_i,  list(range(n2a)))
             coord[n1:] = xyz2
+
+    def add_disp(self, idx2, gx1, gx2, gy1, gy2, dr=0, direction=0):
+        '''
+        Add displacement of part of the molecule
+
+        direction
+          0: x
+          1: y
+          2: z
+        '''
+        all_dims = ('x', 'y', 'z')
+        if direction in all_dims:
+            direction = all_dims.index(direction)
+        if direction not in (0, 1, 2):
+            return
+        coord = self.frames[self.iframe]
+        a_x = np.mean(coord[[K-1 for K in gx2], :], axis=0) - np.mean(coord[[K-1 for K in gx1], :], axis=0)
+        a_y = np.mean(coord[[K-1 for K in gy2], :], axis=0) - np.mean(coord[[K-1 for K in gy1], :], axis=0)
+
+        a_x /= np.linalg.norm(a_x)
+        a_y = a_y - np.dot(a_y, a_x.transpose())*a_x
+        a_y /= np.linalg.norm(a_y)
+        a_z = np.cross(a_x, a_y)
+
+        axes = (a_x, a_y, a_z)
+
+        coord[[_k-1 for _k in idx2], :] += axes[direction]*dr
+        self.frames[self.iframe] = coord
+        self.coord = coord
 
     def var_dist(self, geo, idx1, idx2, r0=None, r_rel=None):
 
