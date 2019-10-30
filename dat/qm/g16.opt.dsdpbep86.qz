@@ -1,0 +1,10 @@
+%chk=${chkfile}
+%nproc=${numproc}
+%mem=${memory}GB
+# opt(ModRedundant) freq DSDPBEP86/def2QZVP nosymm
+
+Optimization
+
+${geometry}
+
+

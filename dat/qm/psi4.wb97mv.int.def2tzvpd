@@ -1,0 +1,17 @@
+#psi4
+#
+memory ${memory} gb
+
+molecule {
+${geometry}units angstrom
+no_reorient  #important for SAPT in psi4, default
+symmetry c1  #important for SAPT in psi4, default
+}
+
+set {
+basis def2-TZVPD
+scf_type DF
+freeze_core True
+}
+energy('scf', dft_functional = 'wB97M-V', bsse_type='cp')
+
