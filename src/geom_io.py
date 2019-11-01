@@ -505,6 +505,7 @@ class GeomConvert(GeomFile):
             geo.iframe = geo.nframes - 1
             geo.cells = cells
 
+        self.comments.extend(comments)
         return geo
 
     def read_xyz(self, inpf) -> GeomFile:
@@ -540,6 +541,7 @@ class GeomConvert(GeomFile):
             geo.nframes = len(frames)
             geo.iframe = geo.nframes - 1
 
+        self.comments.extend(comments)
         return geo
 
     def add_mol(self, geo, idx1, idx2, r0=3.0, mode='face'):
