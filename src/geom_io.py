@@ -37,6 +37,7 @@ class GeomFile:
         self.idx_to_rank = {}
 
     def convert_idx(self, idxs, input_type, output_type):
+        # random
         pass
 
     def traj_rmsd(self, sels=None, outf=None, weight=None):
