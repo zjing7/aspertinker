@@ -36,7 +36,7 @@ class GeomFile:
         self.mass_list = []
         self.idx_to_rank = {}
 
-    def convert_idx():
+    def convert_idx(self, idxs, input_type, output_type):
         pass
 
     def traj_rmsd(self, sels=None, outf=None, weight=None):
