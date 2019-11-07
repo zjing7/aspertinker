@@ -143,6 +143,10 @@ class QMResult(GeomConvert):
             en.set_pattern('^\s+@Final double-hybrid DFT total energy\s+=\s+(%s)'%(self.REGEX_FLOAT))
             all_en.append(en)
 
+            en = QMEntry('ECBS', None)
+            en.set_pattern('^\s+total\s+CBS\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
             en = QMEntry('SNS-MP2', None)
             en.set_pattern('^\s+(%s)\s+\S+'%(self.REGEX_FLOAT), '^\s+ SNS-MP2 Interaction Energy ', [1])
             all_en.append(en)

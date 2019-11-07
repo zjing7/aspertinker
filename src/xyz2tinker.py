@@ -18,7 +18,7 @@ def get_tmp_name(pref='tmp'):
             return fname
     return None
 
-def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False):
+def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False, verbose=1):
     '''
     Convert xyz to txyz
     '''
@@ -30,7 +30,7 @@ def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False):
 
 
     if pxi.top_natoms != pti.top_natoms:
-        print("ERROR: Numbers of atoms do not match")
+        #print("ERROR: Numbers of atoms do not match")
         return
 
     pto = GeomConvert()
@@ -46,10 +46,11 @@ def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False):
 
    
     if can_xi[0] != can_ti[0]:
-        print('ERROR: SMILES strings do not match')
-        print('-->%s'%('.'.join(can_xi[0])))
-        print('-->%s'%('.'.join(can_ti[0])))
-        return
+        if verbose >= 1:
+            print('ERROR: SMILES strings do not match')
+            print('-->%s'%('.'.join(can_xi[0])))
+            print('-->%s'%('.'.join(can_ti[0])))
+        return None
     nfrags = len(can_xi[1])
     x2t = {}
     t2x = {}
@@ -61,7 +62,7 @@ def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False):
             x2t[idx1] = idx2
             t2x[idx2] = idx1
     if original_id:
-        print("retaining original id has not been implemented")
+        print("ERROR: retaining original id has not been implemented")
         return
     else:
         pto.assign_geo(pti)
@@ -69,6 +70,7 @@ def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False):
             idx2 = x2t[idx1]
             pto.coord[idx2-1,:] = pxi.coord[idx1-1,:]
         pto.write_struct(txyz_out, ftype='tinker')
+    return True
 
 
 

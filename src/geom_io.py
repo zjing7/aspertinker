@@ -36,6 +36,9 @@ class GeomFile:
         self.mass_list = []
         self.idx_to_rank = {}
 
+    def convert_idx():
+        pass
+
     def traj_rmsd(self, sels=None, outf=None, weight=None):
         if sels is None:
             sels = [list(range(1, self.top_natoms+1))]
@@ -356,7 +359,7 @@ class GeomConvert(GeomFile):
         if ftype in supported_ftypes:
             outdir = os.path.dirname(outf)
             if (not os.path.isdir(outdir)) and (outdir != ''):
-                os.mkdir(outdir)
+                os.makedirs(outdir)
             with open(outf, 'w') as fout:
 
                 for _i in frameids:
@@ -371,8 +374,6 @@ class GeomConvert(GeomFile):
         else:
             print("WARNING: filetype of %s is not recognized"%(outf))
             return
-
-
 
     def write_xyz(self, outf):
         outp = '%d\n'%(self.top_natoms)
@@ -454,6 +455,7 @@ class GeomConvert(GeomFile):
         if geo.top_natoms == 0:
             return geo
 
+        comments = []
         with open(inpf, 'r') as fin:
             frames = []
             natom = geo.top_natoms
@@ -652,9 +654,70 @@ class GeomConvert(GeomFile):
             xyz2 = align_slow(coord[n1:], rdimer_car[n1:],anchor_i,  list(range(n2a)))
             coord[n1:] = xyz2
 
-    def add_disp(self, idx2, gx1, gx2, gy1, gy2, dr=0, direction=0):
+    def calc_distance_group(self, idx1, idx2):
+        ng1 = len(idx1)
+        ng2 = len(idx2)
+        dist_mat = np.zeros((ng1, ng2))
+        coord = self.frames[self.iframe]
+        for i1, id1 in enumerate(idx1):
+            for i2, id2 in enumerate(idx2):
+                d = np.linalg.norm(coord[id2-1, :] - coord[id1-1, :])
+                dist_mat[i1, i2] = d
+        return np.min(dist_mat)
+
+    def find_interface(self, rcutoff=4.5):
+        ngrps = len(self.group_idx)
+        if ngrps != 2:
+            print('ERROR: only two groups are supported')
+            return
+        ng1 = len(self.group_idx[0])
+        ng2 = len(self.group_idx[1])
+        dist_mat = np.ones((ng1, ng2))*100
+        coord = self.frames[self.iframe]
+        for i1, id1 in enumerate(self.group_idx[0]):
+            for i2, id2 in enumerate(self.group_idx[1]):
+                d = np.linalg.norm(coord[id2-1, :] - coord[id1-1, :])
+                dist_mat[i1, i2] = d
+        idx_inter = [[], []]
+        for i1, d in enumerate(np.min(dist_mat, axis=1)):
+            if d <= rcutoff:
+                idx_inter[0].append(self.group_idx[0][i1])
+        for i2, d in enumerate(np.min(dist_mat, axis=0)):
+            if d <= rcutoff:
+                idx_inter[1].append(self.group_idx[1][i2])
+        if len(idx_inter[0]) + len(idx_inter[1]) < 3:
+            return
+
+        rg1 = (np.mean(coord[[_k-1 for _k in idx_inter[0]], :], axis=0))
+        rg2 = (np.mean(coord[[_k-1 for _k in idx_inter[1]], :], axis=0))
+        R1 = rg2 - rg1
+        R1 /= np.linalg.norm(R1)
+        X1 = coord[[_k-1 for _k in idx_inter[0]+idx_inter[1]], :]
+        X1 -= np.mean(X1, axis=0)
+        Xs = [X1]
+        ws = [R1]
+        for i in range(1, 2):
+            Xnew = Xs[-1] - np.dot(np.dot(Xs[-1], ws[-1].reshape(-1, 1)), ws[-1].reshape(1, -1))
+            w, v = np.linalg.eig(np.dot(Xnew.transpose(), Xnew))
+            wnew = v[:, 0]
+            Xs.append(Xnew)
+            ws.append(wnew)
+        ws.append(np.cross(ws[0], ws[1]))
+
+        return idx_inter, ws
+
+
+    def add_disp(self, idx2, gx1=[], gx2=[], gy1=[], gy2=[], dr=0, direction=0, mode='manual', rcutoff=4.5):
         '''
         Add displacement of part of the molecule
+
+        mode
+          'manual': manually specify the atom indices that define x-axis and y-axis.
+              gx1, gx2, gy1, gy2 need to be provided.
+          'auto': automatically find the interface, and calculate x-axis to be the 
+              direction from the CoM of the first interface to the CoM of the second 
+              interface, and the y-axis to be the principle component of the remaining covariance.
+              rcutoff needs to be provided.
 
         direction
           0: x
@@ -666,14 +729,23 @@ class GeomConvert(GeomFile):
             direction = all_dims.index(direction)
         if direction not in (0, 1, 2):
             return
+        if len(gx1) == len(gx2) == len(gy1) == len(gy2) == 0:
+            mode = 'auto'
         coord = self.frames[self.iframe]
-        a_x = np.mean(coord[[K-1 for K in gx2], :], axis=0) - np.mean(coord[[K-1 for K in gx1], :], axis=0)
-        a_y = np.mean(coord[[K-1 for K in gy2], :], axis=0) - np.mean(coord[[K-1 for K in gy1], :], axis=0)
+        if mode == 'auto':
+            inters = self.find_interface(rcutoff=rcutoff)
+            if inters is None:
+                return
+            idxs, ws = inters 
+            a_x, a_y, a_z = ws[0:3]
+        else:
+            a_x = np.mean(coord[[K-1 for K in gx2], :], axis=0) - np.mean(coord[[K-1 for K in gx1], :], axis=0)
+            a_y = np.mean(coord[[K-1 for K in gy2], :], axis=0) - np.mean(coord[[K-1 for K in gy1], :], axis=0)
 
-        a_x /= np.linalg.norm(a_x)
-        a_y = a_y - np.dot(a_y, a_x.transpose())*a_x
-        a_y /= np.linalg.norm(a_y)
-        a_z = np.cross(a_x, a_y)
+            a_x /= np.linalg.norm(a_x)
+            a_y = a_y - np.dot(a_y, a_x.transpose())*a_x
+            a_y /= np.linalg.norm(a_y)
+            a_z = np.cross(a_x, a_y)
 
         axes = (a_x, a_y, a_z)
 
@@ -709,8 +781,6 @@ class GeomConvert(GeomFile):
                 dr = r0 - _r
 
             coord[n1:] += (_R0*dr).reshape(1,3)
-
-
 
 if __name__ == '__main__':
     geo = GeomConvert()
