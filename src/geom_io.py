@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import os
 import copy
-from utils import align_slow, int_to_xyz
+from utils import align_slow, int_to_xyz, ang_to_mat
 from chem_constants import *
+from collections import defaultdict
 
 DEBUG_FLAG = True
 
@@ -12,7 +13,9 @@ def debug_w(*args):
     if DEBUG_FLAG:
         print(' '.join([str(K) for K in args]))
 
-class GeomFile:
+class Geom:
+    '''Basic geometry object containing topology, trajectory and measurement functions.
+    '''
     def __init__(self):
         self.coord = []
         self.frames = []
@@ -21,10 +24,6 @@ class GeomFile:
         self.iframe = None
         self.group_idx = []
         self.multiplicity = []
-        # atom index does not have to be consecutive. By default it starts from 1
-        # rank starts from 0. Used to index frame, which is np.ndarray
-        # group_idx uses iatom = rank+1
-        # Sorry, I know this is confusing. A better way is to create a class to convert between these numbers
 
         # the dicts map atom index to other info
         self.top_natoms = 0
@@ -36,25 +35,176 @@ class GeomFile:
         self.mass_list = []
         self.idx_to_rank = {}
 
-    def convert_idx(self, idxs, input_type, output_type):
-        pass
+        # Version 2
+        self.verbose = 2
+        self.debug = False
+
+        self.groups = pd.DataFrame(columns='Charge Multiplicity'.split())
+        self.topology = pd.DataFrame(columns='Name Type Mass Group'.split())
+        self.top_conn = defaultdict(list)
+        self.comments = []
+
+        self.natoms = 0
+        self.nframes = 0
+        self.max_natoms = 16
+        self.max_nframes = 1
+        self.max_size = (1, 16, 3)
+
+        self.frames = np.zeros(tuple(self.max_size))
+        self.cells = np.zeros((self.max_size[0], 6))
+        self.iframe = None
+
+class GeomObj(Geom):
+    '''Geometry object containing basic functions.
+    '''
+    def __init__(self):
+        super(GeomObj, self).__init__()
+
+    def msg_error(self, *args, **kwargs):
+        '''Write debug information
+        '''
+        if self.verbose >= 1:
+            print("ERROR:", end=' ')
+            print(*args, **kwargs)
+
+    def msg_warning(self, *args, **kwargs):
+        '''Write debug information
+        '''
+        if self.verbose >= 2:
+            print("WARNING:", end=' ')
+            print(*args, **kwargs)
+
+    def debug_w(self, *args, **kwargs):
+        '''Write debug information
+        '''
+        if self.debug:
+            print("DEBUG:", end=' ')
+            print(*args, **kwargs)
+
+    def convert_top(self):
+        '''Convert between old and new versions.
+        '''
+        self.natoms = self.top_natoms
+        self.topology = pd.DataFrame(index=range(1, self.natoms+1), columns=self.topology.columns)
+        for idx in self.topology.index:
+            for col, item in zip(('Name', 'Type'), (self.top_name, self.top_type)):
+                if idx in item:
+                    self.topology.loc[idx, col] = item[idx]
+        for igrp, grp in enumerate(self.group_idx):
+            for idx in grp:
+                self.topology.loc[idx, 'Group'] = igrp
+        self.topology.loc[self.topology.index[:len(self.mass_list)], 'Mass'] = self.mass_list
+
+    def get_group_index(self):
+        group_idxs = []
+        for idx in self.groups.index:
+            mask = self.topology['Group'] == idx
+            group_idxs.append(list(self.topology.index[mask]))
+        return group_idxs
+
+    def set_group_index(self, group_idxs):
+        self.topology['Group'] = -1
+        #self.topology.drop('Group', axis=1, inplace=True)
+        self.groups = pd.DataFrame(columns = self.groups.columns)
+        for igrp, idxs in enumerate(group_idxs):
+            ranks = self.index_to_rank(idxs)
+            self.topology.loc[idxs, 'Group'] = int(igrp)
+            self.groups.loc[igrp, 'Charge'] = 0
+            self.groups.loc[igrp, 'Multiplicity'] = 1
+
+    def index_to_rank(self, idxs):
+        '''Convert atom index to rank.
+
+        Rank is the order of the atom, starting from 0, which can be used for 
+            indexing coordinates.
+        '''
+        idx = None
+        if isinstance(idxs, int):
+            idx = idxs
+            idxs = [idx]
+        ranks = [self.topology.index.get_loc(_) for _ in idxs if _ in self.topology.index]
+        if len(ranks) != len(idxs):
+            self.msg_warning("%d out of %d indices were not found."%(len(idxs) - len(ranks), len(idxs)))
+        if idx is None:
+            return ranks
+        elif len(ranks) == 1:
+            return ranks[0]
+        else:
+            return None
+
+    def reorder_group(self, new_idxs=[], start=1):
+        '''Assign new group indices.
+
+        Assign indices with either new_idxs or range(start, start+natoms)
+        '''
+        if self.natoms == 0:
+            return
+        if isinstance(new_idxs, np.ndarray):
+            new_idxs = new_idxs.reshape(-1)
+        elif isinstance(new_idxs, (tuple, list)):
+            pass
+        else:
+            self.debug_w("WARNING: `new_idxs' should be list-like")
+            return
+        if len(new_idxs) == 0:
+            new_idxs = list(range(start, len(self.groups)+start))
+        elif len(new_idxs) != len(self.groups):
+            self.debug_w("WARNING: Length of `new_idxs' does not match ngroups")
+            return
+        idx_map = dict(zip(self.groups.index, new_idxs))
+        self.groups.set_index([new_idxs], inplace=True)
+        mask = ~(self.topology['Group'].isnull())
+        self.topology.loc[mask, 'Group'] = self.topology.loc[mask, 'Group'].apply(lambda t: idx_map[t])
+
+    def reorder_index(self, new_idxs=[], start=1):
+        '''Assign new atom indices.
+
+        Assign indices with either new_idxs or range(start, start+natoms)
+        '''
+        if self.natoms == 0:
+            return
+        if isinstance(new_idxs, np.ndarray):
+            new_idxs = new_idxs.reshape(-1)
+        elif isinstance(new_idxs, (tuple, list)):
+            pass
+        else:
+            self.debug_w("WARNING: `new_idxs' should be list-like")
+            return
+        if len(new_idxs) == 0:
+            new_idxs = list(range(start, self.natoms+start))
+        elif len(new_idxs) != self.natoms:
+            self.debug_w("WARNING: Length of `new_idxs' does not match natoms")
+            return
+
+        # update indices in top_conn
+        idx_map = dict(zip(self.topology.index, new_idxs))
+        self.topology.set_index([new_idxs], inplace=True)
+        top_conn_new = defaultdict(list)
+        for idx in self.top_conn:
+            new_idx = idx_map[idx]
+            top_conn_new[new_idx].extend( [idx_map[_k] for _k in self.top_conn[idx]])
+        self.top_conn = top_conn_new
+
 
     def traj_rmsd(self, sels=None, outf=None, weight=None):
         if sels is None:
-            sels = [list(range(1, self.top_natoms+1))]
+            sels = [list(range(1, self.natoms+1))]
         elif sels == 'group':
+            self.group_idx = self.get_group_index()
             sels = self.group_idx
 
         seli = []
         for sel in sels:
-            seli.append([K-1 for K in sel])
+            #seli.append([K-1 for K in sel])
+            seli.append(self.index_to_rank(sel))
 
         ngrp = len(sels)
 
-        if weight is 'mass' and len(self.mass_list) == self.top_natoms:
-            weight = self.mass_list
-        elif weight is None or len(weight) != self.top_natoms:
-            weight = np.ones(self.top_natoms)
+            #weight = self.mass_list
+        if weight is 'mass' and not self.topology['Mass'].isnull().any():
+            weight = self.topology['Mass']
+        elif weight is None or len(weight) != self.natoms:
+            weight = np.ones(self.natoms)
         weight = np.asarray(weight)
 
         df_rmsd = pd.DataFrame(columns = ['G%d'%K for K in range(1, ngrp+1)])
@@ -74,9 +224,10 @@ class GeomFile:
             return 0
         frame = self.frames[iframe]
         for idx in ids:
-            if idx > self.top_natoms:
+            if idx > self.natoms:
                 return 0
-        xyzs = frame[[K-1 for K in ids], :]
+        ranks = self.index_to_rank(ids)
+        xyzs = frame[ranks, :]
         v = 0
         if len(xyzs) == 2:
             r12 = xyzs[1] - xyzs[0]
@@ -212,60 +363,198 @@ class GeomFile:
             pass
         return angle
 
-class GeomConvert(GeomFile):
-    def __init__(self):
-        super(GeomConvert, self).__init__()
-        pass
+    @staticmethod
+    def list_resize(newsize):
+        new_allocated = (newsize >> 3) + (3 if newsize < 9 else 6)
+        new_allocated += newsize
+        return new_allocated
 
-    def assign_geo(self, geo: GeomFile, update_top=True):
+    def assign_top(self, geo: Geom, update_top=True):
+        '''Copy topology from a Geom object.
         '''
-        Copy coordinates from a GeomFile object
-        Optionally keep original topology information, if natoms are the same
-        '''
-        if not isinstance(geo, GeomFile): 
+        if not isinstance(geo, Geom): 
             raise TypeError
 
-        if self.top_natoms != geo.top_natoms:
+        max_size = list(geo.max_size)
+        max_size[0] = 0
+        self.frames = np.zeros(tuple(max_size))
+        self.cells = np.zeros((max_size[0], 6))
+        self.comments = list(geo.comments)
+
+        if True:
+            self.topology = geo.topology.copy()
+            self.groups = geo.groups.copy()
+            self.top_conn = geo.top_conn.copy()
+            self.natoms = geo.natoms
+
+    def assign_geo(self, geo: Geom, update_top=True):
+        '''Copy coordinates from a Geom object.
+
+        Optionally keep original topology information, if natoms are the same
+        '''
+        if not isinstance(geo, Geom): 
+            raise TypeError
+
+        if self.natoms != geo.natoms:
             update_top = True
 
-        self.frames = geo.frames
-        self.cells = geo.cells
-        self.nframes = len(self.frames)
+        self.natoms = geo.natoms
+        self.frames = geo.frames.copy()
+        self.cells = geo.cells.copy()
+        self.nframes = geo.nframes
         self.iframe = geo.iframe
+        self.max_size = tuple(geo.max_size)
+
         if self.iframe is None:
             self.iframe = 0
         if self.iframe < self.nframes and self.nframes > 0:
             self.coord = self.frames[self.iframe]
 
         if update_top:
-            self.group_idx = geo.group_idx
-            self.multiplicity = geo.multiplicity
-            self.top_name = geo.top_name
-            self.top_type = geo.top_type
-            self.top_conn = geo.top_conn
-            self.top_natoms = len(self.coord)
-            self.mass_list = geo.mass_list
-            self.idx_list = sorted(list(self.top_name))
-            self.idx_to_rank.clear()
-            for rank in range(len(self.idx_list)):
-                idx = self.idx_list[rank]
-                self.idx_to_rank[idx] = rank
+            self.topology = geo.topology.copy()
+            self.groups = geo.groups.copy()
+            self.top_conn = geo.top_conn.copy()
+    def set_max_size(self, i, n):
+        '''Set the ith value of max_size to n.
+        '''
+        if i < len(self.max_size):
+            self.max_size = list(self.max_size)
+            self.max_size[i] = n
+            self.max_size = tuple(self.max_size)
+
+class GeomConvert(GeomObj):
+    '''I/O for coordinate files.
+
+    Supported formats: tinker, xyz
+    '''
+    def __init__(self):
+        super(GeomConvert, self).__init__()
+        pass
+
+
+    def combine_topology(self, geo):
+        ""
+        newgeo = GeomObj()
+        newgeo.assign_top(geo)
+
+        if len(set(self.topology.index) & set(newgeo.topology.index)) > 0:
+            newgeo.reorder_index(start=1+max(self.topology.index))
+        if len(set(self.groups.index) & set(newgeo.groups.index)) > 0:
+            newgeo.reorder_group(start=1+max(self.groups.index))
+        self.topology = pd.concat([self.topology, newgeo.topology])
+        self.top_conn.update(newgeo.top_conn)
+        self.groups = pd.concat([self.groups, newgeo.groups])
+        self.natoms = self.natoms + newgeo.natoms
+        self.comments.extend(newgeo.comments)
+
+    def append_atom(self, geo):
+        '''Concatenate two structures.
+
+        The numbers of frames should be the same.
+        '''
+        if self.nframes != geo.nframes:
+            self.msg_error("Numbers of frames do not match")
+            return
+        natoms = self.natoms + geo.natoms
+        max_natoms = self.max_size[1]
+        if max_natoms < natoms:
+            max_natoms = self.list_resize(natoms)
+            #max_size = list(np.max([self.max_size, geo.max_size], axis=0))
+            self.set_max_size(1, max_natoms)
+            frames = np.zeros(self.max_size)
+            frames[:, 0:self.natoms, :] = self.frames
+            self.frames = frames
+        else:
+            self.frames[:, self.natoms:(self.natoms+geo.natoms),  :] = geo.frames[:, :geo.natoms, :]
+        #self.natoms = natoms
+
+        self.combine_topology(geo)
+
+    def append_frame(self, geo):
+        '''Append frames.
+
+        The numbers of atoms should be the same.
+        '''
+        if self.natoms != geo.natoms:
+            self.msg_error("Numbers of atoms do not match")
+            return
+        nframes = self.nframes + geo.nframes
+        max_nframes = self.max_size[0]
+        if max_nframes < nframes:
+            max_nframes = self.list_resize(nframes)
+            self.set_max_size(0, max_nframes)
+            frames = np.zeros(self.max_size)
+            frames[0:self.nframes, :, :] = self.frames
+            self.frames = frames
+        else:
+            self.frames[self.nframes:(self.nframes+geo.nframes), :,  :] = geo.frames
+        self.nframes = nframes
+
+    def delete_atom(self, idxs):
+        '''Delete coords.
+        '''
+        keep_atoms = [_ for _ in self.topology.index if _ not in idxs]
+        keep_ranks = self.index_to_rank(keep_atoms)
+        if len(keep_atoms) == self.natoms:
+            self.msg_warning("No atoms deleted")
+            return
+        self.natoms = len(keep_atoms)
+        max_natoms = self.list_resize(self.natoms)
+        if max_natoms < self.max_size[1]>>2:
+            self.set_max_size(1, max_natoms)
+            frames = np.zeros(self.max_size)
+            frames[:, :self.natoms, :] = self.frames[:, keep_ranks, :]
+            self.frames = frames
+        else:
+            self.frames = self.frames[:, keep_ranks, :]
+
+        self.topology = self.topology.loc[keep_atoms, :].copy()
+        keep_groups = set(self.topology['Group'])
+        self.groups = self.groups.loc[self.groups.index.isin(keep_groups), :].copy()
+        for idx in idxs:
+            if idx in self.top_conn:
+                self.top_conn.pop(idx)
+        for idx in keep_atoms:
+            self.top_conn[idx] = tuple([_ for _ in self.top_conn[idx] if _ in keep_atoms])
+
+    def delete_frame(self, frame_ids):
+        '''Delete frames.
+        '''
+        keep_frames = [_ for _ in range(self.nframes) if _ not in frame_ids]
+        if len(keep_frames) == self.nframes:
+            self.msg_warning("No frames deleted")
+            return
+        self.nframes = len(keep_frames)
+        max_nframes = self.list_resize(self.nframes)
+        if max_nframes < self.max_size[0]>>2:
+            self.set_max_size(0, max_nframes)
+            frames = np.zeros(self.max_size)
+            frames[:self.nframes, :, :] = self.frames[keep_frames, :, :]
+            self.frames = frames
+        else:
+            self.frames = self.frames[keep_frames, :, :]
+
 
     def guess_mass(self):
         self.mass_list = []
-        for idx in self.idx_list:
-            name = self.top_name[idx]
+        #for idx in self.idx_list:
+        for idx in self.topology.index:
+            #name = self.top_name[idx]
+            name = self.topology.loc[idx, 'Name']
             mass = 1.008
             for ele in (name[0:2].capitalize(), name[0].upper(), 'H'):
                 if ele in ELE_2_MASS:
                     mass = ELE_2_MASS[ele]
                     break
-            self.mass_list.append(mass)
+            self.topology.loc[idx, 'Mass'] = mass
+            #self.mass_list.append(mass)
 
-    def shift_idx(self, n0, geo: GeomFile):
+    def shift_idx(self, n0, geo: GeomObj):
+        ''' Shift inplace
+
+        Superseded by "reoder_idx"
         '''
-        shift inplace
-        '''
+        return
         for curr_d in geo.top_name, geo.top_type, geo.top_conn:
             d2 = {}
             for iatom in curr_d:
@@ -274,21 +563,21 @@ class GeomConvert(GeomFile):
             curr_d.update(d2)
         return geo
 
-    def append_frag(self, geo: GeomFile, new_frag=True):
-        '''
+    def append_frag(self, geo: GeomObj, new_frag=True):
+        '''Legacy code.
         if new_frag:
             create new fragments
         else:
             combine fragments with existing ones according to group_idx
         '''
-        if not isinstance(geo, GeomFile): 
+        if not isinstance(geo, GeomObj): 
             raise TypeError
         if self.nframes != geo.nframes:
             return
         geo = copy.deepcopy(geo)
-        n1 = self.top_natoms
-        n2 = geo.top_natoms
-        self.top_natoms = n1+n2
+        n1 = self.natoms
+        n2 = geo.natoms
+        self.natoms = n1+n2
 
         for i in range(n1):
             if len(self.multiplicity) <= i:
@@ -328,20 +617,25 @@ class GeomConvert(GeomFile):
         self.assign_geo(self)
 
     def fill_missing(self):
-        if len(self.group_idx) == 0:
-            self.group_idx = [list(range(1, self.top_natoms+1))]
-
-        nmulti_t = [0, 0]
-        for igrp, grp in enumerate(self.group_idx):
-            if len(self.multiplicity) > igrp:
-                nmulti = self.multiplicity[igrp]
+        if len(self.groups) == 0:
+            if self.topology['Group'].isnull().all():
+                self.topology['Group'] = 0
+                idxs = [0]
             else:
-                nmulti = (0, 1)
-                self.multiplicity.append(nmulti)
-            nmulti_t[0] += nmulti[0]
-            nmulti_t[1] += nmulti[1] - 1
-        nmulti_t[1] += 1
-        self.multiplicity.append(nmulti_t)
+                mask = ~((self.topology['Group'].isnull()) | (self.topology['Group']<0))
+                idxs = sorted(set(self.topology['Group'][mask]))
+            for idx in idxs:
+                self.groups.loc[idx, 'Charge'] = 0
+                self.groups.loc[idx, 'Multiplicity'] = 1
+
+        self.group_idx = []
+        for idx in self.groups.index:
+            mask = self.topology['Group'] == idx
+            self.group_idx.append(list(self.topology.index[mask]))
+
+        if self.topology['Mass'].isnull().all():
+            self.guess_mass()
+        return
 
     def write_traj(self, outf, ftype=None):
         if self.nframes == 0:
@@ -376,11 +670,14 @@ class GeomConvert(GeomFile):
             return
 
     def write_xyz(self, outf):
-        outp = '%d\n'%(self.top_natoms)
+        outp = '%d\n'%(self.natoms)
         outp += '\n'
-        for i in range(self.top_natoms):
-            idx = self.idx_list[i]
-            name = self.top_name[idx]
+        #for i in range(self.natoms):
+        for i in range(self.natoms):
+            #idx = self.idx_list[i]
+            idx = self.topology.index[i]
+            name = self.topology.loc[idx, 'Name']
+            #name = self.top_name[idx]
             outp += '%4s %12.5f %12.5f %12.5f\n'%(name, self.coord[i,0], self.coord[i,1], self.coord[i,2])
         return outp
 
@@ -388,14 +685,15 @@ class GeomConvert(GeomFile):
             fout.write(outp)
 
     def write_tinker(self, outf):
-        outp = '%d\n'%(self.top_natoms)
+        outp = '%d\n'%(self.natoms)
         #outp += '\n'
-        for i in range(self.top_natoms):
-            idx = self.idx_list[i]
-            name = self.top_name[idx]
-            if idx in self.top_type:
-                atype = self.top_type[idx]
-            else:
+        for i in range(self.natoms):
+            #idx = self.idx_list[i]
+            #name = self.top_name[idx]
+            idx = self.topology.index[i]
+            name = self.topology.loc[idx, 'Name']
+            atype = self.topology.loc[idx, 'Type']
+            if np.isnan(atype):
                 atype = 0
             if idx in self.top_conn:
                 conns = ''.join([' %4d'%K for K in self.top_conn[idx]])
@@ -408,22 +706,35 @@ class GeomConvert(GeomFile):
             fout.write(outp)
         pass
 
+    def read_struct(self, *kws, **kwargs):
+        '''Read structure file.
+
+        Supported types: xyz, tinker
+        '''
+        self.read_input(*kws, **kwargs)
+
     def read_input(self, inpf, ftype=None):
-        supported_ftypes = {'xyz':self.read_xyz, 'tinker':self.read_tinker, 'arc':self.read_tinker}
+        '''Read structure file.
+
+        Supported types: xyz, tinker
+        '''
+        supported_ftypes = {'xyz':self.read_xyz, 'tinker':self.read_tinker, 'txyz':self.read_tinker, 'arc':self.read_tinker}
         if ftype is None or ftype not in supported_ftypes:
             suffix = inpf.split('.')[-1]
             ftype = suffix
         if ftype in supported_ftypes:
             geo = supported_ftypes[ftype](inpf)
             self.assign_geo(geo)
+            self.fill_missing()
+            self.group_idx = self.get_group_index()
         else:
             print("WARNING: filetype of %s is not recognized"%(inpf))
 
-    def read_tinker_top(self, inpf) -> GeomFile:
+    def read_tinker_top(self, inpf) -> GeomObj:
         '''
         Read tinker topology
         '''
-        geo = GeomFile()
+        geo = GeomObj()
         with open(inpf, 'r') as fin:
             iline = -1
             istart = 1
@@ -431,7 +742,7 @@ class GeomConvert(GeomFile):
                 iline = iline + 1
                 w = line.split()
                 if iline == 0:
-                    geo.top_natoms = int(w[0])
+                    geo.natoms = int(w[0])
                     if len(w) > 0:
                         geo.comments.append(' '.join(w[1:]))
                     continue
@@ -442,33 +753,34 @@ class GeomConvert(GeomFile):
                         continue
                     else:
                         istart = 1
-                if iline >= istart + geo.top_natoms:
+                if iline >= istart + geo.natoms:
                     break
                 idx = int(w[0])
-                geo.top_name[idx] = w[1]
-                geo.top_type[idx] = int(w[5])
+                geo.topology.loc[idx, ['Name', 'Type']] = w[1], int(w[5])
+                #geo.top_name[idx] = w[1]
+                #geo.top_type[idx] = int(w[5])
                 geo.top_conn[idx] = tuple(map(int, w[6:]))
+            geo.topology['Group'] = 0
         return geo
 
-    def read_tinker(self, inpf) -> GeomFile:
+    def read_tinker(self, inpf) -> GeomObj:
         geo = self.read_tinker_top(inpf)
-        if geo.top_natoms == 0:
+        if geo.natoms == 0:
             return geo
 
         comments = []
         with open(inpf, 'r') as fin:
             frames = []
-            natom = geo.top_natoms
+            natom = geo.natoms
             iatom = 0
 
             iline = -1
             istart = 1
             iframe = -1
-            coord = []
             cells = []
-            cell = []
-            currframe = {}
-            idx_list = sorted(list(geo.top_name))
+            cell = np.zeros(6)
+            coord = [0 for _ in range(3*natom)]
+            idx_read = set()
 
             for line in fin:
                 iline = iline + 1
@@ -490,36 +802,36 @@ class GeomConvert(GeomFile):
                     if iatom < natom and iline>=1:
                         idx = int(w[0])
                         _xyz = (tuple(map(float, w[2:5])))
-                        currframe[idx] = _xyz
+                        rank = geo.index_to_rank(idx)
+                        #coord[rank, :] = _xyz
+                        coord[rank*3:rank*3+3] = _xyz
+                        idx_read.add(idx)
 
                     if iatom == natom - 1:
-                        if len(set(geo.top_name) & set(currframe)) == geo.top_natoms:
-                            coord = []
-                            for idx in idx_list:
-                                coord.append(currframe[idx])
-                            frames.append(np.asarray(coord))
+                        #if len(set(geo.top_name) & set(currframe)) == geo.natoms:
+                        if len(set(geo.topology.index) & idx_read) == geo.natoms:
+                            frames.append(list(coord))
                             cells.append(cell)
-                        cell = []
-                        currframe = {}
+                        cell = np.zeros(6)
+                        idx_read = set()
 
-            geo.frames = frames
+            geo.frames = np.asarray(frames).reshape((-1, natom, 3))
             geo.nframes = len(frames)
             geo.iframe = geo.nframes - 1
-            geo.cells = cells
+            geo.cells = np.asarray(cells)
 
         self.comments.extend(comments)
         return geo
 
-    def read_xyz(self, inpf) -> GeomFile:
-        geo = GeomFile()
+    def read_xyz(self, inpf) -> GeomObj:
+        geo = GeomObj()
         with open(inpf, 'r') as fin:
-            top_name = {}
-            coord = []
             frames = []
             comments = []
             lines = fin.readlines()
             w = lines[0].split()
             natom = int(w[0])
+            coord = [0 for _ in range(3*natom)]
             comments.append(lines[1])
             iatom = 0
             for i in range(2,len(lines)):
@@ -532,16 +844,19 @@ class GeomConvert(GeomFile):
                 iatom += 1
                 _name = w[0]
                 _xyz = (float(w[1]), float(w[2]), float(w[3]))
-                top_name[iatom] = _name
-                coord.append(_xyz)
+                idx = iatom
+                rank = iatom - 1
+                geo.topology.loc[idx, ['Name', 'Group']] = _name, 0
+                coord[rank*3:rank*3+3] = _xyz
                 if iatom == natom:
-                    frames.append(np.asarray(coord))
+                    #frames.append(np.asarray(coord))
+                    frames.append(list(coord))
                     iatom = 0
                     coord = []
-            geo.frames = frames
-            geo.top_name = top_name
+            geo.frames = np.asarray(frames).reshape((-1, natom, 3))
             geo.nframes = len(frames)
             geo.iframe = geo.nframes - 1
+            geo.natoms = natom
 
         self.comments.extend(comments)
         return geo
@@ -616,7 +931,7 @@ class GeomConvert(GeomFile):
             print(self.add_mol.__doc__)
 
 
-    def add_mol_int(self, geo: GeomFile, r_int, anchor_idx):
+    def add_mol_int(self, geo: GeomObj, r_int, anchor_idx):
         '''
         Call GeomConvert.append_frag to append a fragment
         Then apply geometry operations
@@ -626,10 +941,10 @@ class GeomConvert(GeomFile):
 
         anchor_idx: the indices of atoms in the new mol to be aligned to the internel coord
         '''
-        if not isinstance(geo, GeomFile): 
+        if not isinstance(geo, GeomObj): 
             raise TypeError
-        n1 = self.top_natoms
-        n2 = geo.top_natoms
+        n1 = self.natoms
+        n2 = geo.natoms
         n2a = len(r_int)
         if n2a != len(anchor_idx):
             return
@@ -657,15 +972,28 @@ class GeomConvert(GeomFile):
     def calc_distance_group(self, idx1, idx2):
         ng1 = len(idx1)
         ng2 = len(idx2)
+        ranks1 = self.index_to_rank(idx1)
+        ranks2 = self.index_to_rank(idx2)
+
+
         dist_mat = np.zeros((ng1, ng2))
         coord = self.frames[self.iframe]
-        for i1, id1 in enumerate(idx1):
-            for i2, id2 in enumerate(idx2):
-                d = np.linalg.norm(coord[id2-1, :] - coord[id1-1, :])
+        for i1, id1 in enumerate(ranks1):
+            for i2, id2 in enumerate(ranks2):
+                d = np.linalg.norm(coord[id2, :] - coord[id1, :])
                 dist_mat[i1, i2] = d
         return np.min(dist_mat)
 
-    def find_interface(self, rcutoff=4.5):
+    def find_interface(self, rcutoff=4.5, top=None):
+        '''Find the atom indices and unit vectors of the interface.
+
+        returns [indices1, indices2], [x, y, z]
+        x is perpendicular to the interaface.
+        y is the first principle component of the interface.
+
+        The interface is determined by either rcutoff, or the top n closest-distance atoms
+        '''
+        self.group_idx = self.get_group_index()
         ngrps = len(self.group_idx)
         if ngrps != 2:
             print('ERROR: only two groups are supported')
@@ -674,50 +1002,93 @@ class GeomConvert(GeomFile):
         ng2 = len(self.group_idx[1])
         dist_mat = np.ones((ng1, ng2))*100
         coord = self.frames[self.iframe]
-        for i1, id1 in enumerate(self.group_idx[0]):
-            for i2, id2 in enumerate(self.group_idx[1]):
-                d = np.linalg.norm(coord[id2-1, :] - coord[id1-1, :])
+        for i1, id1 in enumerate(self.index_to_rank(self.group_idx[0])):
+            for i2, id2 in enumerate(self.index_to_rank(self.group_idx[1])):
+                d = np.linalg.norm(coord[id2, :] - coord[id1, :])
                 dist_mat[i1, i2] = d
         idx_inter = [[], []]
-        for i1, d in enumerate(np.min(dist_mat, axis=1)):
-            if d <= rcutoff:
-                idx_inter[0].append(self.group_idx[0][i1])
-        for i2, d in enumerate(np.min(dist_mat, axis=0)):
-            if d <= rcutoff:
-                idx_inter[1].append(self.group_idx[1][i2])
+        if isinstance(top, int):
+            ids = np.argsort(dist_mat.reshape(-1))[:top]
+
+            idx_inter[0] = [self.group_idx[0][_] for _ in (set(ids//ng2))]
+            idx_inter[1] = [self.group_idx[1][_] for _ in (set(ids%ng2))]
+            #ids = np.argsort(np.min(dist_mat, axis=1))[:top]
+            #idx_inter[0] = [self.group_idx[0][_] for _ in ids]
+
+            #ids = np.argsort(np.min(dist_mat, axis=0))[:top]
+            #idx_inter[1] = [self.group_idx[1][_] for _ in ids]
+            self.debug_w('Using top n distances. Indices:', idx_inter)
+        else:
+            for i1, d in enumerate(np.min(dist_mat, axis=1)):
+                if d <= rcutoff:
+                    idx_inter[0].append(self.group_idx[0][i1])
+            for i2, d in enumerate(np.min(dist_mat, axis=0)):
+                if d <= rcutoff:
+                    idx_inter[1].append(self.group_idx[1][i2])
+
         if len(idx_inter[0]) + len(idx_inter[1]) < 3:
+            self.msg_error('Not enough atoms were found to define the interface')
             return
 
         rg1 = (np.mean(coord[[_k-1 for _k in idx_inter[0]], :], axis=0))
         rg2 = (np.mean(coord[[_k-1 for _k in idx_inter[1]], :], axis=0))
+        R0 = 0.5*(rg1+rg2)
         R1 = rg2 - rg1
         R1 /= np.linalg.norm(R1)
         X1 = coord[[_k-1 for _k in idx_inter[0]+idx_inter[1]], :]
         X1 -= np.mean(X1, axis=0)
         Xs = [X1]
         ws = [R1]
+        ws = np.zeros((3, 3))
+        ws[0, :] = R1
         for i in range(1, 2):
-            Xnew = Xs[-1] - np.dot(np.dot(Xs[-1], ws[-1].reshape(-1, 1)), ws[-1].reshape(1, -1))
+            Xnew = Xs[-1] - np.dot(np.dot(Xs[-1], ws[i-1].reshape(-1, 1)), ws[i-1].reshape(1, -1))
             w, v = np.linalg.eig(np.dot(Xnew.transpose(), Xnew))
             wnew = v[:, 0]
             Xs.append(Xnew)
-            ws.append(wnew)
-        ws.append(np.cross(ws[0], ws[1]))
+            #ws.append(wnew)
+            ws[i, :] = wnew
+        #ws.append(np.cross(ws[0], ws[1]))
+        ws[2, :] = (np.cross(ws[0, :], ws[1, :]))
 
-        return idx_inter, ws
+        return idx_inter, ws, R0
 
 
-    def add_disp(self, idx2, gx1=[], gx2=[], gy1=[], gy2=[], dr=0, direction=0, mode='manual', rcutoff=4.5):
+    def transform(self, idx2, params, R0=[], axes=[], top=3):
+        '''Apply rigid-body translation and rotation.
+
+        params: [dx, dy, dz, rx, ry, rz]
+        '''
+        if len(R0) != 3 or len(params) != 6:
+            inters = self.find_interface(top=top)
+            if inters is None:
+                return
+            idxs, ws, R0 = inters 
+            axes = ws
+
+        axes = np.array(axes)
+        params = np.array(params)
+        rotmat = ang_to_mat(params[3:6])
+        coord = self.frames[self.iframe]
+        R0 = np.array(R0).reshape(1, 3)
+        ranks = self.index_to_rank(idx2)
+        coord[ranks, :] = np.dot(np.dot(np.dot((coord[ranks, :] - R0), axes.transpose()), rotmat) + params[:3].reshape(1, 3), axes) + R0
+
+        self.frames[self.iframe] = coord
+
+    def add_disp(self, idx2, gx1=[], gx2=[], gy1=[], gy2=[], dr=0, direction=0, mode='manual', rcutoff=4.5, top=5):
         '''
         Add displacement of part of the molecule
 
         mode
           'manual': manually specify the atom indices that define x-axis and y-axis.
               gx1, gx2, gy1, gy2 need to be provided.
-          'auto': automatically find the interface, and calculate x-axis to be the 
-              direction from the CoM of the first interface to the CoM of the second 
-              interface, and the y-axis to be the principle component of the remaining covariance.
+          'distance': automatically find the interface based on cut-off distance, 
+              and calculate x-axis to be the direction from the CoM of the first interface 
+              to the CoM of the second interface, and the y-axis to be the principle component 
+              of the remaining covariance.
               rcutoff needs to be provided.
+          'top': automatically find the interface based on nearest atoms
 
         direction
           0: x
@@ -730,13 +1101,15 @@ class GeomConvert(GeomFile):
         if direction not in (0, 1, 2):
             return
         if len(gx1) == len(gx2) == len(gy1) == len(gy2) == 0:
-            mode = 'auto'
+            mode = 'top'
+        if mode == 'distance':
+            top = None
         coord = self.frames[self.iframe]
-        if mode == 'auto':
-            inters = self.find_interface(rcutoff=rcutoff)
+        if mode in ('top', 'distance'):
+            inters = self.find_interface(rcutoff=rcutoff, top=top)
             if inters is None:
                 return
-            idxs, ws = inters 
+            idxs, ws, R0 = inters 
             a_x, a_y, a_z = ws[0:3]
         else:
             a_x = np.mean(coord[[K-1 for K in gx2], :], axis=0) - np.mean(coord[[K-1 for K in gx1], :], axis=0)
@@ -755,16 +1128,17 @@ class GeomConvert(GeomFile):
 
     def var_dist(self, geo, idx1, idx2, r0=None, r_rel=None):
 
-        if not isinstance(geo, GeomFile): 
+        if not isinstance(geo, Geom): 
             raise TypeError
         if r0 is None and r_rel is None:
             print("No distance specified")
             return
 
-        n1 = self.top_natoms
-        n2 = geo.top_natoms
+        n1 = self.natoms
+        n2 = geo.natoms
 
-        self.append_frag(geo)
+        #self.append_frag(geo)
+        self.append_atom(geo)
 
         for iframe in range(self.nframes):
             coord = self.frames[iframe]

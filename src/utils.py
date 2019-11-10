@@ -22,6 +22,14 @@ def calc_tors(ra, rb, rc, rd):
         pass
     return angle
 
+def project_axis(R, axes, R0 = (0, 0, 0), reverse=False):
+    '''Project a coordinate onto an coordinate system. Or back.
+
+    '''
+    axes = np.array(axes)
+    R0 = np.array(R0)
+    R = np.array(R)
+
 
 def coord_trans(xyz3, int3):
     '''

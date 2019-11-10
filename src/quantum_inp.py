@@ -1,5 +1,5 @@
 
-from geom_io import GeomFile, GeomConvert, debug_w
+from geom_io import GeomObj, GeomConvert, debug_w
 from utils import align_slow, int_to_xyz
 import os
 from string import Template
@@ -91,11 +91,13 @@ class QMInput(GeomConvert):
     def write_qm(self, outf, theory, kws={}):
         self.set_keywords(kws)
         if theory in self.methods:
+            self.group_idx = self.get_group_index()
             method = self.methods[theory]
             if method.program in self.QM_WRITE:
                 outdir = os.path.dirname(outf)
                 if (not os.path.isdir(outdir)) and outdir != '':
                     os.makedirs(outdir)
+                self.group_idx = self.get_group_index()
                 self.QM_WRITE[method.program](outf, method)
         else:
             print(theory, 'not supported')
@@ -109,10 +111,15 @@ class QMInput(GeomConvert):
         ngrps = len(self.group_idx)
         frags = []
         if ngrps > 1:
-            frags = ['%d %d '%tuple(self.multiplicity[-1])]
+            #frags = ['%d %d '%tuple(self.multiplicity[-1])]
+            nmulti = [0, 1]
+            nmulti[0] = self.groups['Charge'].sum()
+            nmulti[1] = (self.groups['Multiplicity']-1).sum()+1
+            frags = ['%d %d '%tuple(nmulti)]
 
         for igrp, grp in enumerate(self.group_idx):
-            nmulti = self.multiplicity[igrp]
+            idx = self.groups.index[igrp]
+            nmulti = self.groups.loc[idx, ['Charge', 'Multiplicity']]
             frags.append('%d %d '%tuple(nmulti))
 
         frags.append('\n')
@@ -121,10 +128,9 @@ class QMInput(GeomConvert):
                 grp_s = '(Fragment=%d)'%(igrp+1)
             else:
                 grp_s = ''
-            for iatom in grp:
-                i = iatom - 1
-                idx = self.idx_list[i]
-                frags[-1] += '%s%s %12.5f %12.5f %12.5f\n'%(self.top_name[idx], grp_s, self.coord[i][0], self.coord[i][1], self.coord[i][2])
+            for idx in grp:
+                i = self.topology.index.get_loc(idx)
+                frags[-1] += '%s%s %12.5f %12.5f %12.5f\n'%(self.topology.loc[idx, 'Name'], grp_s, self.coord[i][0], self.coord[i][1], self.coord[i][2])
         molecule = ''.join(frags)
         #outf2 = '.'.join(outf.split('.')[:-1]) + '.chk'
         outf2 = '.'.join(os.path.split(outf)[-1].split('.')[:-1]) + '.chk'
@@ -144,13 +150,13 @@ class QMInput(GeomConvert):
         frags = []
         molecule = ''
         for igrp, grp in enumerate(self.group_idx):
-            nmulti = self.multiplicity[igrp]
+            #nmulti = self.multiplicity[igrp]
+            idx = self.groups.index[igrp]
+            nmulti = self.groups.loc[idx, ['Charge', 'Multiplicity']]
             frags.append('%d %d\n'%tuple(nmulti))
-            for iatom in grp:
-                i = iatom - 1
-                idx = self.idx_list[i]
-                #i = self.idx_to_rank[iatom]
-                frags[-1] += '%s %12.5f %12.5f %12.5f\n'%(self.top_name[idx], self.coord[i][0], self.coord[i][1], self.coord[i][2])
+            for idx in grp:
+                i = self.topology.index.get_loc(idx)
+                frags[-1] += '%s %12.5f %12.5f %12.5f\n'%(self.topology.loc[idx, 'Name'], self.coord[i][0], self.coord[i][1], self.coord[i][2])
         molecule = '--\n'.join(frags)
         fmts = self.get_default()
         fmts['geometry'] = molecule

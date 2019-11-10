@@ -1,7 +1,7 @@
 #
 import numpy as np
 import copy
-from geom_io import GeomFile, GeomConvert
+from geom_io import GeomObj, GeomConvert
 from quantum_inp import QMInput
 import pandas as pd
 import re
@@ -214,7 +214,7 @@ class QMResult(GeomConvert):
         iframe = self.nframes - 1
         with open(inpf, 'r') as fin:
             iline = -1
-            iatom = self.top_natoms
+            iatom = self.natoms
             for line in fin:
                 iline += 1
                 if self.re_frame_start.match(line):
@@ -223,15 +223,17 @@ class QMResult(GeomConvert):
                     i_coord_start = iline
                     iatom = 0
                     curr_frame = []
-                if iatom < self.top_natoms and self.is_coord_line((iline, i_coord_start, self.top_natoms)):
+                if iatom < self.natoms and self.is_coord_line((iline, i_coord_start, self.natoms)):
                     match = self.re_coord_line.match(line)
                     if match:
                         iatom += 1
                         _x, _y, _z = match.group('x', 'y', 'z')
-                        curr_frame.append([float(_x), float(_y), float(_z)])
+                        #curr_frame.append([float(_x), float(_y), float(_z)])
+                        curr_frame.extend([float(_x), float(_y), float(_z)])
                         #print(_x, _y, _z)
-                        if iatom == self.top_natoms:
-                            self.frames.append(np.asarray(curr_frame))
+                        if iatom == self.natoms:
+                            #self.frames.append(np.asarray(curr_frame))
+                            self.frames = np.append(self.frames, curr_frame.reshape((-1, self.natoms, 3)), axis=0)
                 for entry_name in self.qm_columns:
                     en = self.entry_format[entry_name]
                     value = en.process_line(iline, line)
@@ -239,6 +241,7 @@ class QMResult(GeomConvert):
                         self.qm_data.loc[iframe, entry_name] = value
                         #print(iline, entry_name, value)
                         
+            self.nframes = len(self.frames)
             self.iframe = iframe
             self.assign_geo(self)
 
