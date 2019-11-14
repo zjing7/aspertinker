@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/zj2244/Public/Software/anaconda3/envs/cheminfo/bin/python
 import sys
 import os
 from tools.chem_constants import ELEMENT_NAME
@@ -18,6 +18,22 @@ def get_tmp_name(pref='tmp'):
             return fname
     return None
 
+def convert_txyz2(xyz_in, txyz_in, txyz_out, original_id=False, verbose=1):
+    pxi = GeomConvert()
+    pxi.verbose = 2
+    pxi.read_input(xyz_in, ftype='xyz')
+
+    pti = GeomConvert()
+    pti.verbose = 2
+    pti.read_input(txyz_in, ftype='tinker')
+
+    success = pxi.infer_top(pti)
+    if success:
+        pxi.write_struct(txyz_out, ftype='tinker')
+        return True
+    else:
+        return
+
 def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False, verbose=1):
     '''
     Convert xyz to txyz
@@ -35,16 +51,18 @@ def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False, verbose=1):
 
     pto = GeomConvert()
 
-    ftmp = get_tmp_name()
-    if ftmp is None:
-        print('tmp file exists')
-        return
-    pti.write_struct(ftmp, ftype='xyz')
-    can_xi = sort_atoms(xyz_in) # canonical SMILES
-    can_ti = sort_atoms(ftmp, ftype='xyz')
-    os.remove(ftmp)
+    can_xi = sort_atoms(xyz_in, reorder_frag=True) # canonical SMILES
 
-   
+    #ftmp = get_tmp_name()
+    #if ftmp is None:
+        #print('tmp file exists')
+        #return
+    #pti.write_struct(ftmp, ftype='xyz')
+    #can_ti = sort_atoms(ftmp, ftype='xyz', reorder_frag=False)
+    str_ti = pti.write_struct(None, ftype='xyz')
+    can_ti = sort_atoms(str_ti, ftype='xyz', from_string=True, reorder_frag=True)
+    #os.remove(ftmp)
+
     if can_xi[0] != can_ti[0]:
         if verbose >= 1:
             print('ERROR: SMILES strings do not match')
@@ -62,8 +80,11 @@ def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False, verbose=1):
             x2t[idx1] = idx2
             t2x[idx2] = idx1
     if original_id:
-        print("ERROR: retaining original id has not been implemented")
-        return
+        idx_list = sorted(list(t2x))
+        t_newidx = [t2x[_k] for _k in idx_list]
+        pti.reorder_index(t_newidx, sort=True)
+        pti.assign_geo(pxi, update_top=False)
+        pti.write_struct(txyz_out, ftype='tinker')
     else:
         pto.assign_geo(pti)
         for idx1 in x2t:
@@ -71,9 +92,6 @@ def convert_txyz(xyz_in, txyz_in, txyz_out, original_id=False, verbose=1):
             pto.coord[idx2-1,:] = pxi.coord[idx1-1,:]
         pto.write_struct(txyz_out, ftype='tinker')
     return True
-
-
-
 
 def convert(ftpl, fpsi): 
     fin = open(ftpl, 'r')
@@ -96,4 +114,6 @@ def convert(ftpl, fpsi):
 
 if __name__ == '__main__':
     if len(sys.argv) >= 4:
-        convert_txyz(*sys.argv[1:4])
+        #convert_txyz(*sys.argv[1:4], original_id=True)
+        convert_txyz(*sys.argv[1:4], original_id=False)
+        #convert_txyz2(*sys.argv[1:4], original_id=True)

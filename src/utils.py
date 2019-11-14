@@ -164,7 +164,7 @@ def align_slow(R1, R2, sel1=None, sel2=None, wt1=None, wt2=None, rmsd=False):
         sel2 = list(range(len(R2)))
     if wt1 is None or len(wt1) != len(R1):
         wt1 = np.ones(len(R1))
-    wt1 = np.asarray(wt1)
+    wt1 = np.array(wt1, dtype=np.float)
     wt1 = wt1/np.sum(wt1)
 
     if len(sel1) != len(sel2):

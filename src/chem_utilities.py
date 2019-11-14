@@ -4,7 +4,11 @@ from openbabel import pybel
 import sys
 import numpy as np
 
-def sort_atoms(inpf, ftype=None, reorder_frag=False):
+def auto_fragment(xyz_in):
+    can_xi = sort_atoms(xyz_in) # canonical SMILES
+    return can_xi[1]
+
+def sort_atoms(inpf, ftype=None, reorder_frag=False, from_string=False):
     '''
     inpf: input chemical file name
     reorder_frag: whether to sort the fragments or not
@@ -16,7 +20,10 @@ def sort_atoms(inpf, ftype=None, reorder_frag=False):
     if ftype is None:
         ftype = openbabel.OBConversion.FormatFromExt(inpf)
 
-    mymols = list(pybel.readfile(ftype, inpf))
+    if from_string:
+        mymols = list([pybel.readstring(ftype, inpf)])
+    else:
+        mymols = list(pybel.readfile(ftype, inpf))
     if len(mymols) == 0:
         return [], []
 
@@ -24,7 +31,7 @@ def sort_atoms(inpf, ftype=None, reorder_frag=False):
     #smi = mymol.write('smi')
     smi = mymol.write('can')
     sms = smi.split()[0].split('.')
-    sms = list(set(sms))
+    sms = sorted(list(set(sms)))
     idx_out = []  #all atom
     sm_list = []
     
@@ -50,12 +57,23 @@ def sort_atoms(inpf, ftype=None, reorder_frag=False):
             for idx in idxs:
                 idx_out[-1].extend([idx]+sorted(conn[idx]))
             idx_out[-1] = tuple(idx_out[-1])
+    rank_size = np.argsort([len(_k) for _k in idx_out], axis=0)
+    atom_added = set()
+    idx_sel = set()
+    for i in reversed(rank_size):
+        # filter out sub-fragments that are same as other fragments
+        idx = idx_out[i]
+        if len(set(idx) & atom_added) == 0:
+            atom_added.update(set(idx))
+            idx_sel.add(i)
+
     if reorder_frag:
-        idx_sorted = np.argsort(sms, axis=0)
+        idx_sorted = np.argsort(sm_list, axis=0)
     else:
         idx_sorted = np.argsort([_k[0] for _k in idx_out], axis=0)
-    sm_list = [sm_list[_i] for _i in idx_sorted]
-    idx_out = [idx_out[_i] for _i in idx_sorted]
+        
+    sm_list = [sm_list[_i] for _i in idx_sorted if _i in idx_sel]
+    idx_out = [idx_out[_i] for _i in idx_sorted if _i in idx_sel]
 
     return sm_list, idx_out
 

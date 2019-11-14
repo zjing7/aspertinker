@@ -5,6 +5,7 @@ import os
 import copy
 from utils import align_slow, int_to_xyz, ang_to_mat
 from chem_constants import *
+from chem_utilities import sort_atoms
 from collections import defaultdict
 
 DEBUG_FLAG = True
@@ -95,6 +96,13 @@ class GeomObj(Geom):
                 self.topology.loc[idx, 'Group'] = igrp
         self.topology.loc[self.topology.index[:len(self.mass_list)], 'Mass'] = self.mass_list
 
+    def reset_frames(self):
+        self.max_size = (0, max(16, self.natoms), 3)
+        self.frames = np.zeros(tuple(self.max_size))
+        self.cells = np.zeros((self.max_size[0], 6))
+        self.iframe = None
+        self.nframes = 0
+
     def get_group_index(self):
         group_idxs = []
         for idx in self.groups.index:
@@ -156,7 +164,17 @@ class GeomObj(Geom):
         mask = ~(self.topology['Group'].isnull())
         self.topology.loc[mask, 'Group'] = self.topology.loc[mask, 'Group'].apply(lambda t: idx_map[t])
 
-    def reorder_index(self, new_idxs=[], start=1):
+    def sort_index(self):
+        '''Sort atoms according to index
+        '''
+        order_new = np.argsort(self.topology.index)
+        if (order_new == np.arange(len(self.topology.index))).all():
+            return
+        self.topology = self.topology.iloc[order_new, :]
+        order_new2 = np.append(order_new, np.arange(len(order_new), self.frames.shape[1]))
+        self.frames = self.frames[:, order_new2, :]
+
+    def reorder_index(self, new_idxs=[], start=1, sort=False):
         '''Assign new atom indices.
 
         Assign indices with either new_idxs or range(start, start+natoms)
@@ -171,7 +189,10 @@ class GeomObj(Geom):
             self.debug_w("WARNING: `new_idxs' should be list-like")
             return
         if len(new_idxs) == 0:
-            new_idxs = list(range(start, self.natoms+start))
+            if start is None:
+                new_idxs = list(self.topology.index)
+            else:
+                new_idxs = list(range(start, self.natoms+start))
         elif len(new_idxs) != self.natoms:
             self.debug_w("WARNING: Length of `new_idxs' does not match natoms")
             return
@@ -185,6 +206,8 @@ class GeomObj(Geom):
             top_conn_new[new_idx].extend( [idx_map[_k] for _k in self.top_conn[idx]])
         self.top_conn = top_conn_new
 
+        if sort:
+            self.sort_index()
 
     def traj_rmsd(self, sels=None, outf=None, weight=None):
         if sels is None:
@@ -563,6 +586,42 @@ class GeomConvert(GeomObj):
             curr_d.update(d2)
         return geo
 
+    def infer_top(self, geo):
+        '''Assign topology based on connectivity instead of atom order
+        '''
+        if self.natoms != geo.natoms:
+            self.msg_error('Cannot infer topology from a different molecule.')
+            return
+        ftype = 'xyz'
+        xyz_in = self.write_struct(None, ftype=ftype)
+        # template xyz
+        txyz_in = geo.write_struct(None, ftype=ftype)
+        can_xi = sort_atoms(xyz_in, ftype=ftype, from_string=True, reorder_frag=True)
+        can_ti = sort_atoms(txyz_in, ftype=ftype, from_string=True, reorder_frag=True)
+
+        if can_xi[0] != can_ti[0]:
+            self.msg_error('ERROR: SMILES strings do not match')
+            self.msg_error('-->%s'%('.'.join(can_xi[0])))
+            self.msg_error('-->%s'%('.'.join(can_ti[0])))
+            return
+        geo = copy.deepcopy(geo)
+        nfrags = len(can_xi[1])
+        x2t = {}
+        t2x = {}
+        for i in range(nfrags):
+            natoms0 = len(can_xi[1][i])
+            for j in range(natoms0):
+                idx1 = can_xi[1][i][j]
+                idx2 = can_ti[1][i][j]
+                x2t[idx1] = idx2
+                t2x[idx2] = idx1
+        idx_list = sorted(list(t2x))
+        t_newidx = [t2x[_k] for _k in idx_list]
+        geo.reorder_index(t_newidx, sort=True)
+        geo.assign_geo(self, update_top=False)
+        self.assign_geo(geo)
+        return True
+
     def append_frag(self, geo: GeomObj, new_frag=True):
         '''Legacy code.
         if new_frag:
@@ -643,6 +702,10 @@ class GeomConvert(GeomObj):
         self.write_struct(outf, ftype=ftype, frameids=list(range(self.nframes)))
 
     def write_struct(self, outf, ftype=None, frameids=[]):
+        '''Write structure file.
+
+        If outf is None, return a string.
+        '''
         supported_ftypes = {'xyz':self.write_xyz, 'tinker':self.write_tinker, 'arc':self.write_tinker}
         if len(frameids) == 0:
             frameids = [self.iframe]
@@ -651,20 +714,28 @@ class GeomConvert(GeomObj):
             suffix = outf.split('.')[-1]
             ftype = suffix
         if ftype in supported_ftypes:
-            outdir = os.path.dirname(outf)
-            if (not os.path.isdir(outdir)) and (outdir != ''):
-                os.makedirs(outdir)
-            with open(outf, 'w') as fout:
-
+            if outf is None:
+                outp = ''
                 for _i in frameids:
                     if _i < 0 or _i >= self.nframes:
                         continue
                     self.coord = self.frames[_i]
-                    outp = supported_ftypes[ftype](outf)
-                    fout.write(outp)
-
-            # reset coord 
-            self.coord = self.frames[self.iframe]
+                    outp += supported_ftypes[ftype](outf)
+                self.coord = self.frames[self.iframe]
+                return outp
+            else:
+                outdir = os.path.dirname(outf)
+                if (not os.path.isdir(outdir)) and (outdir != ''):
+                    os.makedirs(outdir)
+                with open(outf, 'w') as fout:
+                    for _i in frameids:
+                        if _i < 0 or _i >= self.nframes:
+                            continue
+                        self.coord = self.frames[_i]
+                        outp = supported_ftypes[ftype](outf)
+                        fout.write(outp)
+                # reset coord 
+                self.coord = self.frames[self.iframe]
         else:
             print("WARNING: filetype of %s is not recognized"%(outf))
             return

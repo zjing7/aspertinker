@@ -100,6 +100,21 @@ class QMResult(GeomConvert):
             en.set_pattern('^ Error termination via Lnk1e in (\S+)', convert_func = lambda t: t)
             all_en.append(en)
 
+        elif ftype == 'qchem':
+            all_en = []
+
+            en = QMEntry('Energy', None)
+            en.set_pattern('^.*\s+total energy =\s+(%s) au'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('Time', None)
+            en.set_pattern('^\s+Total job time:\s+(%s)s\(wall\)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('Success', False)
+            en.set_pattern('^\s+\*\s+Thank you very much for using Q-Chem\. (.*)\*', convert_func = lambda t: True)
+            all_en.append(en)
+            pass
         elif ftype == 'tinker':
             all_en = []
 
@@ -194,8 +209,12 @@ class QMResult(GeomConvert):
             self.regex_coord_start = '^\s{20,30}Input orientation:'
             self.regex_coord_line  = '^\s+\d{1,3}\s+\d{1,3}\s+\d{1,3}\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'
             self.is_coord_line = lambda t: 5 <= (t[0] - t[1]) and (t[0] - t[1]) < t[2]+5
+        elif ftype == 'qchem':
+            self.regex_frame_start = '^\s+Standard Nuclear Orientation'
+            self.regex_coord_start = '^\s+Standard Nuclear Orientation'
+            self.regex_coord_line  = '^\s+(?P<i>\d{1,3})\s+(?P<n>\S{1,3})\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'
+            self.is_coord_line = lambda t: 3 <= (t[0] - t[1]) and (t[0] - t[1]) < t[2]+3
         elif ftype == 'psi4':
-            pass
             self.regex_frame_start = '^\*\*\* tstart\(\) called'
             self.regex_coord_start = '^\s+Center\s+X\s+Y\s+Z\s+'
             self.regex_coord_line  = '^\s+\S{1,7}\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'
@@ -206,9 +225,45 @@ class QMResult(GeomConvert):
             self.re_coord_start = re.compile(self.regex_coord_start)
             self.re_coord_line = re.compile(self.regex_coord_line)
 
+    def read_qm_top(self, inpf, ftype='g16'):
+        self.set_coord_pattern(ftype)
+        MAXSIZE=1000000
+        iframe = 0
+        with open(inpf, 'r') as fin:
+            iline = -1
+            self.natoms = MAXSIZE
+            iatom = self.natoms
+            for line in fin:
+                iline += 1
+                if self.re_frame_start.match(line):
+                    iframe += 1
+                if self.re_coord_start.match(line):
+                    i_coord_start = iline
+                    iatom = 0
+                if iatom < self.natoms and self.is_coord_line((iline, i_coord_start, self.natoms)):
+                    match = self.re_coord_line.match(line)
+                    if match:
+                        iatom += 1
+                        _x, _y, _z = match.group('x', 'y', 'z')
+                        idx = iatom
+                        if 'i' in match.groupdict():
+                            idx = int(match.group('i'))
+                        if 'n' in match.groupdict():
+                            name = match.group('n')
+                            if idx in self.topology.index:
+                                break
+                            self.topology.loc[idx, 'Name'] = name
+            self.natoms = len(self.topology)
+            self.reset_frames()
+            self.fill_missing()
+                                
+
     def read_qm(self, inpf, ftype='g16'):
         self.set_entry_pattern(ftype)
         self.set_coord_pattern(ftype)
+
+        if self.natoms == 0:
+            self.read_qm_top(inpf, ftype=ftype)
 
         i_coord_start = -100
         iframe = self.nframes - 1
@@ -228,12 +283,13 @@ class QMResult(GeomConvert):
                     if match:
                         iatom += 1
                         _x, _y, _z = match.group('x', 'y', 'z')
+                                
                         #curr_frame.append([float(_x), float(_y), float(_z)])
                         curr_frame.extend([float(_x), float(_y), float(_z)])
                         #print(_x, _y, _z)
                         if iatom == self.natoms:
                             #self.frames.append(np.asarray(curr_frame))
-                            self.frames = np.append(self.frames, curr_frame.reshape((-1, self.natoms, 3)), axis=0)
+                            self.frames = np.append(self.frames, np.array(curr_frame).reshape((-1, self.natoms, 3)), axis=0)
                 for entry_name in self.qm_columns:
                     en = self.entry_format[entry_name]
                     value = en.process_line(iline, line)
