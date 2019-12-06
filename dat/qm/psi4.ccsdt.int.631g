@@ -9,9 +9,9 @@ symmetry c1  #important for SAPT in psi4, default
 }
 
 set {
-basis ${psi4_basis}
+basis 6-31g**
 scf_type DF
 freeze_core True
 }
-energy('${psi4_energy}', max_nbody=2, bsse_type='nocp')
+energy('mp2/aug-cc-pv[tq]z + D:ccsd(t)/6-31g**', bsse_type='cp')
 

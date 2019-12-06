@@ -1,0 +1,10 @@
+%chk=${chkfile}
+%nproc=${numproc}
+%mem=${memory}GB
+# opt(ModRedundant,Loose) TPSSTPSS/def2TZVP EmpiricalDispersion=GD3BJ nosymm SCRF=PCM
+
+Optimization
+
+${geometry}
+${PS}
+

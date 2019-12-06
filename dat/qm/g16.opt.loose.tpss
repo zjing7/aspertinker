@@ -1,10 +1,11 @@
 %chk=${chkfile}
 %nproc=${numproc}
 %mem=${memory}GB
-# opt(ModRedundant) freq TPSSTPSS/def2TZVP EmpiricalDispersion=GD3BJ nosymm
+# opt(ModRedundant,Loose) freq TPSSTPSS/def2TZVP EmpiricalDispersion=GD3BJ nosymm
 
 Optimization
 
 ${geometry}
 ${PS}
+
 

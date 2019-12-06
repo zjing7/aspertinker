@@ -1,0 +1,9 @@
+%chk=${chkfile}
+%nproc=${numproc}
+%mem=${memory}GB
+# TPSSTPSS/def2TZVP EmpiricalDispersion=GD3BJ nosymm SCRF=PCM
+
+Single point
+
+${geometry}
+
