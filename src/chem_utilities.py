@@ -4,8 +4,8 @@ from openbabel import pybel
 import sys
 import numpy as np
 
-def auto_fragment(xyz_in):
-    can_xi = sort_atoms(xyz_in) # canonical SMILES
+def auto_fragment(xyz_in, **kwargs):
+    can_xi = sort_atoms(xyz_in, **kwargs) # canonical SMILES
     return can_xi[1]
 
 def sort_atoms(inpf, ftype=None, reorder_frag=False, from_string=False):
@@ -17,6 +17,12 @@ def sort_atoms(inpf, ftype=None, reorder_frag=False, from_string=False):
 
     Note: Only read the first molecule in the file
     '''
+    #pybel.ob.OBMessageHandler.SetOutputLevel(pybel.ob.OBMessageHandler(), pybel.ob.obError)
+    #openbabel.OBMessageHandler.SetOutputLevel(openbabel.OBMessageHandler(), 3)
+    openbabel.obErrorLog.SetOutputLevel(openbabel.obError)
+    #openbabel.OBMessageHandler.StopLogging(openbabel.OBMessageHandler())
+    #openbabel.OBMessageHandler.StopLogging(openbabel.OBMessageHandler())
+    #print('output level', openbabel.OBMessageHandler.GetOutputLevel(openbabel.OBMessageHandler()))
     if ftype is None:
         ftype = openbabel.OBConversion.FormatFromExt(inpf)
 

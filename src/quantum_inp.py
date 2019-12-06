@@ -33,6 +33,7 @@ class QMInput(GeomConvert):
         self.keywords['numproc'] = 8
         self.keywords['psi4_energy'] = 'scf'
         self.keywords['psi4_basis'] = 'def2-TZVP'
+        self.keywords['PS'] = ''
 
         self.get_template()
 

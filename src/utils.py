@@ -185,6 +185,8 @@ def align_slow(R1, R2, sel1=None, sel2=None, wt1=None, wt2=None, rmsd=False):
         return resi
 
     sols = []
+    #print(R1[sel1, :])
+    #print(R2[sel2, :])
     sols.append( scipy.optimize.least_squares(residual, rot_ang0, verbose=0, kwargs={'r1':R1[sel1,:], 'r2':R2[sel2,:], 'wt':wt1[sel1]}))
     rot_ang = sols[0].x
     rot_mat = ang_to_mat(rot_ang)

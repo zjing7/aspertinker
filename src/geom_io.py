@@ -7,6 +7,7 @@ from utils import align_slow, int_to_xyz, ang_to_mat
 from chem_constants import *
 from chem_utilities import sort_atoms
 from collections import defaultdict
+from scipy.spatial import distance_matrix
 
 DEBUG_FLAG = True
 
@@ -44,6 +45,7 @@ class Geom:
         self.topology = pd.DataFrame(columns='Name Type Mass Group'.split())
         self.top_conn = defaultdict(list)
         self.comments = []
+        self.comment = ''
 
         self.natoms = 0
         self.nframes = 0
@@ -133,6 +135,7 @@ class GeomObj(Geom):
         ranks = [self.topology.index.get_loc(_) for _ in idxs if _ in self.topology.index]
         if len(ranks) != len(idxs):
             self.msg_warning("%d out of %d indices were not found."%(len(idxs) - len(ranks), len(idxs)))
+            raise ValueError
         if idx is None:
             return ranks
         elif len(ranks) == 1:
@@ -209,7 +212,34 @@ class GeomObj(Geom):
         if sort:
             self.sort_index()
 
+    def traj_align(self, sels=None, weight=None):
+        ''' Align trajectory
+        '''
+        if self.nframes <= 1:
+            return
+        if weight == 'mass' and not self.topology['Mass'].isnull().any():
+            weight = self.topology['Mass'].to_numpy()
+        elif weight == 'heavy' and not self.topology['Mass'].isnull().any():
+            weight = self.topology['Mass'].to_numpy(dtype=np.float)
+            mask = weight > 3.1
+            if sum(mask) >= 3:
+                weight[~mask] = 0
+        elif weight is None or len(weight) != self.natoms:
+            weight = np.ones(self.natoms)
+        weight = np.asarray(weight, dtype='float')
+
+        if sels == 'heavy' and not self.topology['Mass'].isnull().any():
+            sels = np.arange(self.natoms)[self.topology['Mass'].to_numpy(dtype=np.float) > 3.1]
+        if sels is None:
+            sels = list(range(0, self.natoms))
+
+        i0 = 0
+        for i1 in range(0, self.nframes):
+            self.frames[i1] = align_slow(self.frames[i1], self.frames[i0], sel1=sels, sel2=sels, wt1=weight[sels], rmsd=False)
+
     def traj_rmsd(self, sels=None, outf=None, weight=None):
+        ''' Calc trajectory rmsd of groups
+        '''
         if sels is None:
             sels = [list(range(1, self.natoms+1))]
         elif sels == 'group':
@@ -224,11 +254,16 @@ class GeomObj(Geom):
         ngrp = len(sels)
 
             #weight = self.mass_list
-        if weight is 'mass' and not self.topology['Mass'].isnull().any():
+        if weight == 'mass' and not self.topology['Mass'].isnull().any():
             weight = self.topology['Mass']
+        elif weight == 'heavy' and not self.topology['Mass'].isnull().any():
+            weight = self.topology['Mass'].to_numpy(dtype=np.float)
+            mask = weight > 3.1
+            if sum(mask) >= 3:
+                weight[~mask] = 0
         elif weight is None or len(weight) != self.natoms:
             weight = np.ones(self.natoms)
-        weight = np.asarray(weight)
+        weight = np.asarray(weight, dtype='float')
 
         df_rmsd = pd.DataFrame(columns = ['G%d'%K for K in range(1, ngrp+1)])
         i0 = 0
@@ -241,6 +276,17 @@ class GeomObj(Geom):
             df_rmsd.to_csv(outf, float_format='%.4f')
         return df_rmsd
         
+    @staticmethod
+    def get_ortho(arr1, arr2):
+        '''Get orthogonal axes from two non-colinear vectors
+        '''
+        ax1 = np.array(arr1)
+        ax2 = np.array(arr2)
+        ax2 -= np.sum(ax1*ax2) * ax1 / np.linalg.norm(ax1)**2.0
+        ax1 /= np.linalg.norm(ax1)
+        ax2 /= np.linalg.norm(ax2)
+        ax3 = np.cross(ax1, ax2)
+        return np.array([ax1, ax2, ax3])
 
     def measure(self, ids, iframe=0):
         if len(self.frames) <= iframe:
@@ -452,6 +498,7 @@ class GeomConvert(GeomObj):
     '''
     def __init__(self):
         super(GeomConvert, self).__init__()
+        self.version = 2
         pass
 
 
@@ -480,15 +527,16 @@ class GeomConvert(GeomObj):
             return
         natoms = self.natoms + geo.natoms
         max_natoms = self.max_size[1]
-        if max_natoms < natoms:
+        if max_natoms < natoms or self.max_size != self.frames.shape:
+            max_size = tuple(np.array([self.max_size, self.frames.shape]).max(axis=0))
+            self.max_size = max_size
             max_natoms = self.list_resize(natoms)
             #max_size = list(np.max([self.max_size, geo.max_size], axis=0))
             self.set_max_size(1, max_natoms)
             frames = np.zeros(self.max_size)
             frames[:, 0:self.natoms, :] = self.frames
             self.frames = frames
-        else:
-            self.frames[:, self.natoms:(self.natoms+geo.natoms),  :] = geo.frames[:, :geo.natoms, :]
+        self.frames[:, self.natoms:natoms,  :] = geo.frames[:, :geo.natoms, :]
         #self.natoms = natoms
 
         self.combine_topology(geo)
@@ -503,15 +551,18 @@ class GeomConvert(GeomObj):
             return
         nframes = self.nframes + geo.nframes
         max_nframes = self.max_size[0]
-        if max_nframes < nframes:
+        if max_nframes < nframes or self.max_size != self.frames.shape:
+            max_size = tuple(np.array([self.max_size, self.frames.shape]).max(axis=0))
+            self.max_size = max_size
+
             max_nframes = self.list_resize(nframes)
             self.set_max_size(0, max_nframes)
             frames = np.zeros(self.max_size)
-            frames[0:self.nframes, :, :] = self.frames
+            frames[0:self.nframes, :self.natoms, :] = self.frames[:, :self.natoms, :]
             self.frames = frames
-        else:
-            self.frames[self.nframes:(self.nframes+geo.nframes), :,  :] = geo.frames
+        self.frames[self.nframes:(self.nframes+geo.nframes), :self.natoms,  :] = geo.frames[:geo.nframes, :geo.natoms, :]
         self.nframes = nframes
+        self.comments.extend(geo.comments)
 
     def delete_atom(self, idxs):
         '''Delete coords.
@@ -557,6 +608,60 @@ class GeomConvert(GeomObj):
         else:
             self.frames = self.frames[keep_frames, :, :]
 
+    def reconstruct(self, frame0, iframe, idxs_base):
+        '''Reconstruct coordinates from selected atoms and a template frame
+        '''
+        N = self.natoms
+        R0 = frame0[:N]
+        R1 = self.frames[iframe, :N, :].copy()
+        distmat0 = distance_matrix(R0, R0)
+        ranks = self.index_to_rank(idxs_base)
+        # flag whether the atom has been constructed
+        idx_f = np.zeros(N, dtype=bool)
+        idx_f[ranks] = True
+        idx_all = np.arange(N)
+        np.random.seed(0)
+        R1[~idx_f, :] = np.random.rand(sum(~idx_f), 3)*5
+
+        # [id, atom1, atom2, atom3]
+        # id: atom with missing coord
+        # atom[1-3]: 3 non-linear closest atoms 
+        ids = np.zeros((sum(~idx_f), 4), dtype=int)
+        for i in range(sum(~idx_f)):
+            imin = np.argsort(distmat0[idx_f][:, ~idx_f].reshape(-1), kind='mergesort')[0]
+            # missing atom closest to existing atoms
+            idmin = idx_all[~idx_f][imin % sum(~idx_f)]
+            id_dist = list(idx_all[idx_f][np.argsort(distmat0[idx_f][:, idmin])])
+            id_dist += list(idx_all[~idx_f][np.argsort(distmat0[~idx_f][:, idmin])]    )
+            id_anchors = list(id_dist[:2])
+            ids[i, 0] = idmin
+            ax1 = R0[id_anchors[1]]-R0[id_anchors[0]]
+            ax1 /= np.linalg.norm(ax1)
+            for i1 in id_dist[2:]:
+                ax2 = R0[i1]-R0[id_anchors[0]]
+                _cos = np.sum(ax1*ax2)/np.linalg.norm(ax1)/np.linalg.norm(ax2)
+                r_ax2 = np.linalg.norm(ax2)*np.sqrt(1-_cos**2.0)
+                if r_ax2 > 0.2:
+                    id_anchors.append(i1)
+                    break
+            if len(id_anchors) < 3:
+                self.msg_error('Not enough atoms or too many collinear atoms for reconstruction.')
+                return
+            ids[i, 1:4] = id_anchors
+            idx_f[idmin] = True
+
+        coords = np.zeros((len(ids), 3))
+        for i in range(len(ids)):
+            axes = self.get_ortho(R0[ids[i, 2]] - R0[ids[i, 1]], R0[ids[i, 3]] - R0[ids[i, 1]])
+            coord0 = R0[ids[i, 0]] - R0[ids[i, 1]]
+            coord1 = np.dot(coord0.reshape(1, 3), np.linalg.inv(axes))
+            coords[i, :] = coord1
+        for i in range(len(ids)):
+            axes = self.get_ortho(R1[ids[i, 2]] - R1[ids[i, 1]], R1[ids[i, 3]] - R1[ids[i, 1]])
+            coord1 = coords[i, :]
+            coord0 = np.dot(coord1.reshape(1, 3), axes)
+            R1[ids[i, 0], :] = R1[ids[i, 1], :] + coord0
+        self.frames[iframe, :N, :] = R1
 
     def guess_mass(self):
         self.mass_list = []
@@ -706,7 +811,7 @@ class GeomConvert(GeomObj):
 
         If outf is None, return a string.
         '''
-        supported_ftypes = {'xyz':self.write_xyz, 'tinker':self.write_tinker, 'arc':self.write_tinker}
+        supported_ftypes = {'xyz':self.write_xyz, 'txyz':self.write_tinker, 'tinker':self.write_tinker, 'arc':self.write_tinker}
         if len(frameids) == 0:
             frameids = [self.iframe]
         outp = ''
@@ -731,6 +836,8 @@ class GeomConvert(GeomObj):
                     for _i in frameids:
                         if _i < 0 or _i >= self.nframes:
                             continue
+                        if _i < len(self.comments):
+                            self.comment = self.comments[_i]
                         self.coord = self.frames[_i]
                         outp = supported_ftypes[ftype](outf)
                         fout.write(outp)
@@ -742,7 +849,7 @@ class GeomConvert(GeomObj):
 
     def write_xyz(self, outf):
         outp = '%d\n'%(self.natoms)
-        outp += '\n'
+        outp += '%s\n'%self.comment
         #for i in range(self.natoms):
         for i in range(self.natoms):
             #idx = self.idx_list[i]
@@ -784,7 +891,7 @@ class GeomConvert(GeomObj):
         '''
         self.read_input(*kws, **kwargs)
 
-    def read_input(self, inpf, ftype=None):
+    def read_input(self, inpf, ftype=None, ignore_top=False):
         '''Read structure file.
 
         Supported types: xyz, tinker
@@ -795,9 +902,12 @@ class GeomConvert(GeomObj):
             ftype = suffix
         if ftype in supported_ftypes:
             geo = supported_ftypes[ftype](inpf)
-            self.assign_geo(geo)
-            self.fill_missing()
-            self.group_idx = self.get_group_index()
+            if ignore_top:
+                self.assign_geo(geo, update_top=False)
+            else:
+                self.assign_geo(geo)
+                self.fill_missing()
+                self.group_idx = self.get_group_index()
         else:
             print("WARNING: filetype of %s is not recognized"%(inpf))
 
@@ -896,18 +1006,22 @@ class GeomConvert(GeomObj):
 
     def read_xyz(self, inpf) -> GeomObj:
         geo = GeomObj()
+        comments = []
         with open(inpf, 'r') as fin:
             frames = []
-            comments = []
             lines = fin.readlines()
+            if len(lines) == 0:
+                return geo
             w = lines[0].split()
             natom = int(w[0])
             coord = [0 for _ in range(3*natom)]
-            comments.append(lines[1])
+            comments.append(lines[1].strip())
             iatom = 0
             for i in range(2,len(lines)):
                 line = lines[i]
                 w = line.split()
+                if i % (natom + 2) ==1:
+                    comments.append(lines[i].strip())
                 if i % (natom + 2) <=1:
                     continue
                 if len(w) < 4:
@@ -1101,24 +1215,40 @@ class GeomConvert(GeomObj):
             self.msg_error('Not enough atoms were found to define the interface')
             return
 
-        rg1 = (np.mean(coord[[_k-1 for _k in idx_inter[0]], :], axis=0))
-        rg2 = (np.mean(coord[[_k-1 for _k in idx_inter[1]], :], axis=0))
+        ranks = self.index_to_rank(idx_inter[0]), self.index_to_rank(idx_inter[1])
+        #rg1 = (np.mean(coord[[_k-1 for _k in idx_inter[0]], :], axis=0))
+        #rg2 = (np.mean(coord[[_k-1 for _k in idx_inter[1]], :], axis=0))
+        rg1 = (np.mean(coord[ranks[0], :], axis=0))
+        rg2 = (np.mean(coord[ranks[1], :], axis=0))
         R0 = 0.5*(rg1+rg2)
         R1 = rg2 - rg1
         R1 /= np.linalg.norm(R1)
-        X1 = coord[[_k-1 for _k in idx_inter[0]+idx_inter[1]], :]
+        #X1 = coord[[_k-1 for _k in idx_inter[0]+idx_inter[1]], :]
+        allranks = list(ranks[0])+list(ranks[1])
+        X1 = coord[allranks, :]
         X1 -= np.mean(X1, axis=0)
         Xs = [X1]
-        ws = [R1]
+        #ws = [R1]
         ws = np.zeros((3, 3))
         ws[0, :] = R1
         for i in range(1, 2):
-            Xnew = Xs[-1] - np.dot(np.dot(Xs[-1], ws[i-1].reshape(-1, 1)), ws[i-1].reshape(1, -1))
-            w, v = np.linalg.eig(np.dot(Xnew.transpose(), Xnew))
-            wnew = v[:, 0]
+            Xnew = Xs[-1] - np.dot(np.dot(Xs[0], ws[i-1].reshape(-1, 1)), ws[i-1].reshape(1, -1))
+            if self.version > 0:
+                w, v = np.linalg.eig(np.dot(Xnew.transpose(), Xnew))
+            else:
+                w, v = np.linalg.eigh(np.dot(Xnew.transpose(), Xnew))
+            w_order = np.argsort(w)
+            #wnew = v[:, 0]
+
+            self.debug_w(ws[i-1], w, v)
+            if self.version < 2:
+                wnew = v[:, 0]
+            else:
+                wnew = v[:, w_order[-1]]
             Xs.append(Xnew)
             #ws.append(wnew)
-            ws[i, :] = wnew
+            ws[i, :] = np.array(wnew/np.linalg.norm(wnew))
+        self.debug_w(Xs)
         #ws.append(np.cross(ws[0], ws[1]))
         ws[2, :] = (np.cross(ws[0, :], ws[1, :]))
 
@@ -1143,7 +1273,14 @@ class GeomConvert(GeomObj):
         coord = self.frames[self.iframe]
         R0 = np.array(R0).reshape(1, 3)
         ranks = self.index_to_rank(idx2)
+        self.debug_w('param', params)
+        self.debug_w('rot mat', rotmat)
+        self.debug_w('axes', axes)
+        self.debug_w('R0', R0)
+        self.debug_w('coord old', coord[ranks, :])
         coord[ranks, :] = np.dot(np.dot(np.dot((coord[ranks, :] - R0), axes.transpose()), rotmat) + params[:3].reshape(1, 3), axes) + R0
+        self.debug_w('coord new', coord[ranks, :])
+            
 
         self.frames[self.iframe] = coord
 

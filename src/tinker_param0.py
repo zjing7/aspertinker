@@ -142,7 +142,8 @@ class TinkerParam0:
             self.header = ''
             for line in fin:
                 iline = iline + 1
-                w = line.split()
+                #w = line.split()
+                w = line.split('#')[0].split()
                 if len(w) == 0:
                     continue
                 entry = w[0]

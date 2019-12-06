@@ -28,7 +28,7 @@ class QMEntry:
 
         self.value_ilines = set(line_number)
         if not callable(convert_func):
-            convert_func = lambda t: float(t)
+            convert_func = lambda t: float(t[0])
         self.convert_func = convert_func
 
     def process_line(self, iline, line):
@@ -41,7 +41,10 @@ class QMEntry:
             if iline - self.iline_start in self.value_ilines:
                 match = self.re_value.match(line)
         if match:
-            value = self.convert_func(match.group(1))
+            #value = self.convert_func(match.group(1))
+            if self.name == 'Time':
+                pass
+            value = self.convert_func(match.groups())
             self.value = value
             return value
 
@@ -60,7 +63,8 @@ class QMResult(GeomConvert):
         self.regex_coord_start = "No man's land"
         self.regex_coord_line  = "No man's land"
 
-        self.REGEX_FLOAT = '-?\d+(\.\d+)?'
+        #self.REGEX_FLOAT = '-?\d+(\.\d+)?'
+        self.REGEX_FLOAT = '-?\d+(?:\.\d+)?'
         self.entry_format = {}
         self.MAX_VALUE = 1e5
         self.MIN_VALUE = -1e5
@@ -100,11 +104,28 @@ class QMResult(GeomConvert):
             en.set_pattern('^ Error termination via Lnk1e in (\S+)', convert_func = lambda t: t)
             all_en.append(en)
 
+            en = QMEntry('Time', None)
+            en.set_pattern('^ Elapsed time:\s+(%s) days\s+(%s) hours\s+(%s) minutes\s+(%s) seconds\.'%(self.REGEX_FLOAT, self.REGEX_FLOAT, self.REGEX_FLOAT, self.REGEX_FLOAT) , \
+                    convert_func = lambda t: float(t[0])*24+float(t[1])+float(t[2])/60+float(t[3])/3600)
+            all_en.append(en)
+
         elif ftype == 'qchem':
             all_en = []
 
             en = QMEntry('Energy', None)
             en.set_pattern('^.*\s+total energy =\s+(%s) au'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('MP2_Total', None)
+            en.set_pattern('^\s+RIMP2\s+total energy =\s+(%s) au'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('MP2_SS', None)
+            en.set_pattern('^\s+TOTAL SS RI-MP2 ENERGY\s+=\s+(%s) au'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('MP2_OS', None)
+            en.set_pattern('^\s+TOTAL OS RI-MP2 ENERGY\s+=\s+(%s) au'%(self.REGEX_FLOAT))
             all_en.append(en)
 
             en = QMEntry('Time', None)
@@ -297,6 +318,7 @@ class QMResult(GeomConvert):
                         self.qm_data.loc[iframe, entry_name] = value
                         #print(iline, entry_name, value)
                         
+            self.max_size = self.frames.shape
             self.nframes = len(self.frames)
             self.iframe = iframe
             self.assign_geo(self)
