@@ -1,11 +1,13 @@
 # index of qm template files
 # index, program, filename, keywords to be replaced
-psi4 psi4 psi4.gen                         memory geometry psi4_energy psi4_basis
+psi4 psi4 psi4.gen                         memory geometry psi4_energy psi4_basis PS
+psi4/full psi4 psi4.gen.full               memory geometry psi4_energy psi4_basis PS
+psi4/full/cp psi4 psi4.gen.full.cp         memory geometry psi4_energy psi4_basis PS
 psi4/nocp psi4 psi4.gen.nocp               memory geometry psi4_energy psi4_basis
-psi4/cp psi4 psi4.gen.cp                   memory geometry psi4_energy psi4_basis
-psi4/opt psi4 psi4.opt.nocp                memory geometry psi4_energy psi4_basis
-sapt2/atz psi4 psi4.sapt2p.augccpvtz       memory geometry
-sapt2/adz psi4 psi4.sapt2p.augccpvdz       memory geometry
+psi4/cp psi4 psi4.gen.cp                   memory geometry psi4_energy psi4_basis PS
+psi4/opt psi4 psi4.opt.nocp                memory geometry psi4_energy psi4_basis PS
+sapt2/atz psi4 psi4.sapt2p.augccpvtz       memory geometry PS
+sapt2/adz psi4 psi4.sapt2p.augccpvdz       memory geometry PS
 dfmp2/adtz psi4 psi4.mp2.cbs.augccpvdtz    memory geometry
 dfmp2/int/atz psi4 psi4.mp2.int.augccpvtz  memory geometry
 dfmp2/int/def2tzvpd psi4 psi4.mp2.int.def2tzvpd    memory geometry
@@ -24,6 +26,19 @@ blyp-d3bj/int/dzvp psi4 psi4.blyp.int.dzvp      memory geometry
 pbe-d3bj/int/dzvp psi4 psi4.pbe.int.dzvp        memory geometry
 pbe0-d3bj/int/dzvp psi4 psi4.pbe0.int.dzvp      memory geometry
 tpss-d3bj/int/dzvp psi4 psi4.tpss.int.dzvp      memory geometry
+
+cp2k/tpssd3 cp2k cp2k.tpss                      geometry charge multi
+cp2k/md/tpssd3 cp2k cp2k.md.tpss                geometry charge multi nsteps
+cp2k/mdvibfix/tpssd3 cp2k cp2k.mdvibfix.tpss    geometry charge multi nsteps coordfile
+cp2k/reftrj/tpssd3 cp2k cp2k.reftrj.tpss        geometry charge multi lastframe
+cp2k/reftrj/tpss cp2k cp2k.reftrj.tpssxc        geometry charge multi lastframe
+cp2k/reftrj/libxc cp2k cp2k.reftrj.libxc        geometry charge multi lastframe xc
+cp2k/mdvib/tpssd3 cp2k cp2k.mdvib.tpss          charge multi nsteps coordfile
+cp2k/vib/tpssd3 cp2k cp2k.vib.tpss           charge multi coordfile
+cp2k/opt/tpssd3 cp2k cp2k.opt.tpss           geometry charge multi
+cp2k/tpssd3/wavelet cp2k cp2k.tpss.wavelet      geometry charge multi
+cp2k/tpssd3/wl cp2k cp2k.tpss.wl      geometry charge multi
+cp2k/tpssd3/fine cp2k cp2k.tpss.800ry           geometry charge multi
 
 b3lyp/dzvp/nocp psi4 psi4.b3lyp.dzvp.nocp    memory geometry
 blyp/dzvp/nocp  psi4 psi4.blyp.dzvp.nocp     memory geometry
@@ -47,6 +62,7 @@ opt/tpss g16 g16.opt.tpss                  memory geometry numproc chkfile PS
 opt/loose/tpss g16 g16.opt.loose.tpss      memory geometry numproc chkfile PS
 opt/tpss/pcm g16 g16.opt.loose.tpss.pcm    memory geometry numproc chkfile PS
 opt/pcm/tpss g16 g16.opt.loose.tpss.pcm    memory geometry numproc chkfile PS
+g16 g16          g16.gen                   memory geometry numproc chkfile PS
 g16/tpss/pcm g16 g16.tpss.pcm              memory geometry numproc chkfile
 g16/dsdpbep86/qz g16 g16.dsdpbep86.qz      memory geometry numproc chkfile
 g16/dsdpbep86/tz g16 g16.dsdpbep86.tz      memory geometry numproc chkfile

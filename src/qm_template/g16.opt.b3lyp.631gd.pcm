@@ -1,10 +1,11 @@
 %chk=${chkfile}
 %nproc=${numproc}
 %mem=${memory}GB
-# opt(ModRedundant) freq b3lyp/6-31g(d) nosymm scrf(pcm)
+# opt(Loose,ModRedundant) b3lyp/6-31g(d) EmpiricalDispersion=GD3BJ nosymm scrf(pcm)
 
 Optimization
 
 ${geometry}
+${PS}
 
 

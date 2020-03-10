@@ -287,6 +287,13 @@ class GeomObj(Geom):
         ax2 /= np.linalg.norm(ax2)
         ax3 = np.cross(ax1, ax2)
         return np.array([ax1, ax2, ax3])
+    @staticmethod
+    def get_principle(arrs):
+        R0 = np.mean(arrs, axis=0)
+        X = arrs - R0
+        w, v = np.linalg.eig(np.dot(X.transpose(), X))
+        w_order = np.argsort(-w)
+        return v.transpose()[w_order, :]
 
     def measure(self, ids, iframe=0):
         if len(self.frames) <= iframe:
@@ -607,6 +614,7 @@ class GeomConvert(GeomObj):
             self.frames = frames
         else:
             self.frames = self.frames[keep_frames, :, :]
+        self.iframe = min(self.nframes-1, self.iframe)
 
     def reconstruct(self, frame0, iframe, idxs_base):
         '''Reconstruct coordinates from selected atoms and a template frame

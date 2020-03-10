@@ -13,5 +13,5 @@ basis ${psi4_basis}
 scf_type DF
 freeze_core True
 }
-energy('${psi4_energy}')
+energy('${psi4_energy}', max_nbody=2, bsse_type='nocp')
 

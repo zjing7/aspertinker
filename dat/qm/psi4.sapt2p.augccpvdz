@@ -13,4 +13,6 @@ basis aug-cc-pVDZ
 scf_type DF
 freeze_core True
 }
+${PS}
+
 energy('sapt2+')

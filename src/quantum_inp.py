@@ -19,7 +19,7 @@ class QMInput(GeomConvert):
         self.pkgpath = os.path.dirname((__file__))
         #self.template_path = os.path.join(self.pkgpath, 'qm_template', 'template.list')
         self.template_path = os.path.join(self.pkgpath, '..', 'dat', 'qm', 'template.list')
-        self.QM_WRITE = {'psi4':self.write_psi4, 'g16':self.write_g16}
+        self.QM_WRITE = {'psi4':self.write_psi4, 'g16':self.write_g16, 'cp2k':self.write_cp2k}
         self.QM_PROGRAMS = set(self.QM_WRITE)
         self.memory = 20
         self.numproc = 8
@@ -53,8 +53,10 @@ class QMInput(GeomConvert):
                 tplt_file = os.path.join(template_dir, w[2])
                 kws = w[3:]
                 if program not in self.QM_PROGRAMS:
+                    print('Skip', line)
                     continue
                 if not os.path.isfile(tplt_file):
+                    print('Skip', line)
                     continue
                 methods[w[0]] = QMMethod(program, tplt_file, kws)
 
@@ -99,6 +101,7 @@ class QMInput(GeomConvert):
                 if (not os.path.isdir(outdir)) and outdir != '':
                     os.makedirs(outdir)
                 self.group_idx = self.get_group_index()
+                self.coord = self.frames[self.iframe, :self.natoms, :]
                 self.QM_WRITE[method.program](outf, method)
         else:
             print(theory, 'not supported')
@@ -161,6 +164,26 @@ class QMInput(GeomConvert):
         molecule = '--\n'.join(frags)
         fmts = self.get_default()
         fmts['geometry'] = molecule
+        if len(set(fmts) & set(method.keywords)) == len(set(method.keywords)):
+            with open(method.tplt_file) as fin:
+                outp = Template(fin.read())
+                with open(outf, 'w') as fout:
+                    fout.write(outp.safe_substitute(fmts))
+
+    def write_cp2k(self, outf, method: QMMethod):
+        if not isinstance(method, QMMethod): 
+            raise TypeError
+        self.fill_missing()
+        frags = []
+        molecule = ''
+        for idx in self.topology.index:
+            i = self.topology.index.get_loc(idx)
+            molecule += '%s %12.5f %12.5f %12.5f\n'%(self.topology.loc[idx, 'Name'], self.coord[i][0], self.coord[i][1], self.coord[i][2])
+        #molecule = ''.join(frags)
+        fmts = self.get_default()
+        fmts['geometry'] = molecule
+        fmts['charge'] = int(self.groups.loc[0, 'Charge'])
+        fmts['multi'] =  int(self.groups.loc[0, 'Multiplicity'])
         if len(set(fmts) & set(method.keywords)) == len(set(method.keywords)):
             with open(method.tplt_file) as fin:
                 outp = Template(fin.read())

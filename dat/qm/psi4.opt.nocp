@@ -13,5 +13,13 @@ basis ${psi4_basis}
 scf_type DF
 freeze_core True
 }
+
+${PS}
+
 optimize('${psi4_energy}')
+
+E, wfn = freq('${psi4_energy}', return_wfn=True)
+set t 298.15
+set p 100000
+thermo(wfn, wfn.frequencies())
 

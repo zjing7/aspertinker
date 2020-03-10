@@ -69,18 +69,34 @@ class QMResult(GeomConvert):
         self.MAX_VALUE = 1e5
         self.MIN_VALUE = -1e5
 
+    @staticmethod
+    def g16_conv(t):
+        s = t[0].replace('D', 'E')
+        return float(s)
+
     def set_entry_pattern(self, ftype = 'g16'):
         if self.ftype == ftype:
             return
         self.ftype = ftype
+        g16_float = '-?\d+(?:\.\d+)?(?:D.\d+)?'
 
         all_en = []
-        if ftype == 'g16':
+        if ftype in ('g16', 'g16std', 'g16cp'):
             all_en = []
 
             en = QMEntry('Energy', None)
             #en.set_pattern('^ SCF Done: ', '^ SCF Done:\s+\S+\s+=\s+(%s)\s+A\.U\.'%(self.REGEX_FLOAT), [0])
             en.set_pattern('^ SCF Done:\s+\S+\s+=\s+(%s)\s+A\.U\.'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('E2', None)
+            #en.set_pattern('^ SCF Done: ', '^ SCF Done:\s+\S+\s+=\s+(%s)\s+A\.U\.'%(self.REGEX_FLOAT), [0])
+            en.set_pattern('^ E2 =\s+(%s)'%(g16_float), convert_func=self.g16_conv)
+            all_en.append(en)
+
+            en = QMEntry('CCSDT', None)
+            #en.set_pattern('^ SCF Done: ', '^ SCF Done:\s+\S+\s+=\s+(%s)\s+A\.U\.'%(self.REGEX_FLOAT), [0])
+            en.set_pattern('^ CCSD\(T\)=\s+(%s)'%(g16_float), convert_func=self.g16_conv)
             all_en.append(en)
 
             en = QMEntry('MaxForce', None)
@@ -92,7 +108,20 @@ class QMResult(GeomConvert):
             all_en.append(en)
 
             en = QMEntry('Freq1', None)
-            en.set_pattern('^ Low frequencies ---\s+(%s)\s+'%(self.REGEX_FLOAT), '^ Full mass-weighted force constant matrix', [1])
+            #en.set_pattern('^ Low frequencies ---\s+(%s)\s+'%(self.REGEX_FLOAT), '^ Full mass-weighted force constant matrix', [1])
+            en.set_pattern('^ Frequencies --\s+(%s)\s+'%(self.REGEX_FLOAT), '^ Harmonic frequencies ', [6])
+            all_en.append(en)
+
+            en = QMEntry('lnQ', None)
+            en.set_pattern('^ Total V=0\s+\S+\s+\S+\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('G', None)
+            en.set_pattern('^ Sum of electronic and thermal Free Energies=\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('H', None)
+            en.set_pattern('^ Sum of electronic and thermal Enthalpies=\s+(%s)'%(self.REGEX_FLOAT))
             all_en.append(en)
 
             en = QMEntry('Success', False)
@@ -107,6 +136,17 @@ class QMResult(GeomConvert):
             en = QMEntry('Time', None)
             en.set_pattern('^ Elapsed time:\s+(%s) days\s+(%s) hours\s+(%s) minutes\s+(%s) seconds\.'%(self.REGEX_FLOAT, self.REGEX_FLOAT, self.REGEX_FLOAT, self.REGEX_FLOAT) , \
                     convert_func = lambda t: float(t[0])*24+float(t[1])+float(t[2])/60+float(t[3])/3600)
+            all_en.append(en)
+
+        elif ftype == 'cp2k':
+            all_en = []
+
+            en = QMEntry('Energy', None)
+            en.set_pattern('^.*\s+Total energy:\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('Success', False)
+            en.set_pattern('^.*\s+PROGRAM ENDED AT(.*)', convert_func = lambda t: True)
             all_en.append(en)
 
         elif ftype == 'qchem':
@@ -156,6 +196,22 @@ class QMResult(GeomConvert):
 
             en = QMEntry('MP2_Ref', None)
             en.set_pattern('^\s+Reference Energy  \s+=\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('MP2_corl', None)
+            en.set_pattern('^\s+MP2 correlation energy  \s+=\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('CCSD_corl', None)
+            en.set_pattern('^\s+CCSD correlation energy  \s+=\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('CCSD_ref', None)
+            en.set_pattern('^\s+Reference energy    (file100)\s+=\s+(%s)'%(self.REGEX_FLOAT))
+            all_en.append(en)
+
+            en = QMEntry('T_ener', None)
+            en.set_pattern('^\s+\(T\) energy\s+=\s+(%s)'%(self.REGEX_FLOAT))
             all_en.append(en)
 
             en = QMEntry('MP2_SS', None)
@@ -228,6 +284,16 @@ class QMResult(GeomConvert):
         if ftype == 'g16':
             self.regex_frame_start = '^\s{20,30}Input orientation:'
             self.regex_coord_start = '^\s{20,30}Input orientation:'
+            self.regex_coord_line  = '^\s+\d{1,3}\s+\d{1,3}\s+\d{1,3}\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'
+            self.is_coord_line = lambda t: 5 <= (t[0] - t[1]) and (t[0] - t[1]) < t[2]+5
+        if ftype == 'g16std':
+            self.regex_frame_start = '^\s{20,30}Standard orientation:'
+            self.regex_coord_start = '^\s{20,30}Standard orientation:'
+            self.regex_coord_line  = '^\s+\d{1,3}\s+\d{1,3}\s+\d{1,3}\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'
+            self.is_coord_line = lambda t: 5 <= (t[0] - t[1]) and (t[0] - t[1]) < t[2]+5
+        if ftype == 'g16cp':
+            self.regex_frame_start = '^ Counterpoise: doing'
+            self.regex_coord_start = '^\s{20,30}Standard orientation:'
             self.regex_coord_line  = '^\s+\d{1,3}\s+\d{1,3}\s+\d{1,3}\s+(?P<x>-?\d+\.\d+)\s+(?P<y>-?\d+\.\d+)\s+(?P<z>-?\d+\.\d+)'
             self.is_coord_line = lambda t: 5 <= (t[0] - t[1]) and (t[0] - t[1]) < t[2]+5
         elif ftype == 'qchem':
@@ -310,11 +376,12 @@ class QMResult(GeomConvert):
                         #print(_x, _y, _z)
                         if iatom == self.natoms:
                             #self.frames.append(np.asarray(curr_frame))
-                            self.frames = np.append(self.frames, np.array(curr_frame).reshape((-1, self.natoms, 3)), axis=0)
+                            self.frames = np.append(self.frames[:self.nframes, :self.natoms, :], np.array(curr_frame).reshape((-1, self.natoms, 3)), axis=0)
+                            self.nframes += 1
                 for entry_name in self.qm_columns:
                     en = self.entry_format[entry_name]
                     value = en.process_line(iline, line)
-                    if value:
+                    if value is not None:
                         self.qm_data.loc[iframe, entry_name] = value
                         #print(iline, entry_name, value)
                         
