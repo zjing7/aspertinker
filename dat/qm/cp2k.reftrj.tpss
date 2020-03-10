@@ -1,0 +1,154 @@
+&GLOBAL                                                                                           
+  PROJECT        bomd
+  PRINT_LEVEL    LOW
+  RUN_TYPE       MD
+  ECHO_INPUT     .TRUE.
+  &TIMINGS
+     THRESHOLD 0.01
+  &END
+&END GLOBAL
+&FORCE_EVAL
+  METHOD Quickstep
+  &DFT
+    BASIS_SET_FILE_NAME  BASIS_MOLOPT_ALL
+    POTENTIAL_FILE_NAME  POTENTIAL
+    CHARGE ${charge}
+    MULTIPLICITY ${multi}
+    &MGRID
+      NGRIDS 5
+      CUTOFF  400
+    &END MGRID
+    &POISSON
+      PERIODIC NONE
+      ! POISSON_SOLVER MT
+      POISSON_SOLVER WAVELET
+    &END POISSON
+    &QS
+      METHOD GPW
+      EPS_DEFAULT 1.0E-15
+      EPS_PGF_ORB 1.0E-30
+    &END QS
+    &SCF
+      SCF_GUESS ATOMIC
+      EPS_SCF 1.0E-5
+      MAX_SCF 100
+    &END SCF
+! Parameters for TPSS-D3BJ
+    &XC
+      DENSITY_CUTOFF 1.0e-9
+      DENSITY_SMOOTH_CUTOFF_RANGE 0
+      FUNCTIONAL_ROUTINE NEW
+      &XC_FUNCTIONAL
+	&TPSS
+	&END
+      &END XC_FUNCTIONAL
+      &XC_GRID
+        XC_DERIV NN50_SMOOTH
+        XC_SMOOTH_RHO NONE
+      &END XC_GRID
+      &vdW_POTENTIAL
+         DISPERSION_FUNCTIONAL PAIR_POTENTIAL
+         &PAIR_POTENTIAL
+            TYPE DFTD3(BJ)
+            PARAMETER_FILE_NAME dftd3.dat
+	    D3BJ_SCALING 1.0000 0.4535 1.9435 4.4752
+            VERBOSE_OUTPUT
+            ! REFERENCE_FUNCTIONAL TPSS
+            R_CUTOFF 12.
+            EPS_CN 0.01
+            &PRINT_DFTD OFF
+            &END
+         &END PAIR_POTENTIAL
+      &END vdW_POTENTIAL
+    &END XC
+  &END DFT
+  &SUBSYS
+    &CELL
+      ABC [angstrom]  20.000   20.000   20.000
+      PERIODIC NONE
+    &END CELL
+    &KIND H
+      BASIS_SET TZV2P-MOLOPT-GTH
+      POTENTIAL GTH-PBE-q1
+    &END KIND
+    &KIND O
+      BASIS_SET TZV2P-MOLOPT-GTH
+      POTENTIAL GTH-PBE-q6
+    &END KIND
+    &KIND C
+      BASIS_SET TZV2P-MOLOPT-GTH
+      POTENTIAL GTH-PBE
+    &END KIND
+    &KIND N
+      BASIS_SET TZV2P-MOLOPT-GTH
+      POTENTIAL GTH-PBE
+    &END KIND
+    &KIND F
+      BASIS_SET TZV2P-MOLOPT-GTH
+      POTENTIAL GTH-PBE
+    &END KIND
+    &KIND Cl
+      BASIS_SET TZV2P-MOLOPT-GTH
+      POTENTIAL GTH-PBE
+    &END KIND
+    &KIND K
+      BASIS_SET TZV2P-MOLOPT-SR-GTH
+      POTENTIAL GTH-PBE
+    &END KIND
+    &KIND Rb
+      BASIS_SET TZV2P-MOLOPT-SR-GTH
+      POTENTIAL GTH-PBE
+    &END KIND
+    &KIND X 
+      GHOST .TRUE.
+      BASIS_SET NONE
+    &END KIND
+    &KIND H-Gh
+      ELEMENT H
+      GHOST .TRUE.
+      BASIS_SET TZV2P-MOLOPT-GTH-q1
+      POTENTIAL GTH-PBE-q1
+    &END KIND
+    &KIND O-Gh
+      ELEMENT O
+      GHOST .TRUE.
+      BASIS_SET TZV2P-MOLOPT-GTH-q6
+      POTENTIAL GTH-PBE-q6
+    &END KIND
+    &TOPOLOGY
+      &CENTER_COORDINATES
+      &END
+    &END TOPOLOGY
+    &COORD
+${geometry}
+    &END COORD
+  &END SUBSYS
+&END FORCE_EVAL
+&MOTION
+  &MD
+    ENSEMBLE REFTRAJ
+    STEPS 10000
+    TIMESTEP 0.5
+    TEMPERATURE 300.0
+    &REFTRAJ
+      EVAL_ENERGY_FORCES
+      TRAJ_FILE_NAME trajin.xyz
+      FIRST_SNAPSHOT 1
+      LAST_SNAPSHOT ${lastframe}
+      STRIDE 1
+    &END REFTRAJ
+    &THERMOSTAT
+      TYPE CSVR
+      &CSVR
+        TIMECON 100.0
+      &END CSVR
+      &NOSE
+        LENGTH 3
+        YOSHIDA 3
+        TIMECON 100.0
+        MTS 2
+      &END NOSE
+    &END
+  &END MD
+&END MOTION
+

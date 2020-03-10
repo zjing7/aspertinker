@@ -1,0 +1,11 @@
+%chk=${chkfile}
+%nproc=${numproc}
+%mem=${memory}GB
+# ${method}
+
+input
+
+${geometry}
+${PS}
+
+
